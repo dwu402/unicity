@@ -15,9 +15,7 @@ from difflib import SequenceMatcher
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # to do list:
-# - other distance metrics: permutation vs. combination
-# - does similarity metric need to be collapsed for smaller code samples? i.e.,
-#   similarity of long code weighted more than similarity of short code?
+# - try Jaro distance
 
 # General classes
 class Portfolio(object):
@@ -1645,25 +1643,6 @@ def _save_test(fl, err, lns):
     for ln in lns: 
         fp.write(ln.rstrip()+'\n')
     fp.close()
-def repair_filename(fl0, fls):
-    ''' Nudge filenames towards expected template (clients can't follow instructions).
-    '''
-    bestmatch = 3
-    repairfl = None
-    fle = os.path.splitext(fl0)
-    ext = fle[-1]
-    fle = fle[0] + ext.lower()
-
-    for fl in fls:
-        rt = (1.-SequenceMatcher(None, fle, fl).ratio())*len(fle)
-        if rt <= bestmatch:
-            bestmatch = rt
-            repairfl = copy(fl)
-
-    if repairfl is not None:
-        return os.path.splitext(repairfl)[0]+ext.lower()
-    else:
-        return fl0
 def File(filename, zipfile=None):
     ''' Assess file type and return corresponding object.
     '''
@@ -1734,6 +1713,7 @@ def compare_command_freq(file1, file2, template, name):
         dissimilar = 1.
 
     return 1.-similar/(similar+dissimilar)
+
 def _get_client_code(client, import_froms):
     '''
     '''
