@@ -55,9 +55,21 @@ def test_method_multiprocessing():
     # Use simple multiprocessing to speed up testing.
     proj.test('test_function', ncpus = 2)
 
+def test_and_summarise():
+    # load project
+    proj = Project('example_project.zip', expecting = ['functions.py','tasks.py'])
+
+    # run the unit tests
+    proj.test('test_function')
+
+    # details of the test suite will be appended to the summary report
+    proj.summarise('example_project.log')
+
 if __name__ == "__main__":
-    test_simple_method()
+    #test_simple_method()
 
     #test_method_specific_client()
 
     #test_method_multiprocessing()
+    
+    test_and_summarise()
