@@ -805,10 +805,25 @@ class Project(object):
         '''
         # interpret input routine
         fl, obj, func = split_at_delimiter(comparison.routine)
+        # check for misspellings
+        if fl not in self._expecting:
+            raise UnicityError("'{:s}' not an expected client file".format(fl))
         if func is None:
             func = fl.split('.')[0]
         elif obj is not None:
             func = obj + '.' + func
+
+        # check for misspellings
+        presence = 0.
+        for cl in self.clientlist:
+            try:
+                cl.portfolio.files[fl].functions[func]
+                presence += 1
+            except:
+                pass
+        presence = presence/len(self.clientlist)
+        if presence < 0.1:
+            raise UnicityError("'{:s}' does not appear frequently in '{}'".format(func,fl))
         
         # set output name
         clientstr = ''
@@ -1062,12 +1077,18 @@ class Project(object):
             utlns.extend(ts.functions[uf].lns)
         # unit test - remove import_froms calling out to test file
         lns = []
+        found_client_file_import = False
         for ln in ts.functions[routine].lns:
             if 'from ' in ln and ' import ' in ln:
                 if ln.split('from ')[1].split(' import')[0].strip()+'.py' in self._expecting:
+                    found_client_file_import = True
                     continue
             lns.append(ln)
         utlns.extend(lns)
+
+        # check for misspellings
+        if not found_client_file_import:
+            raise UnicityError("test function '{:s}' does not contain import statements to client files".format(routine))
 
         # CONSTRUCT tests
         pars = []
@@ -1096,6 +1117,10 @@ class Project(object):
             lns.append('    chdir(cwd)')
             pars.append([ln.replace('\t','    ').rstrip()+'\n' for ln in lns])
         
+        # error file
+        err_dir = 'failed_{:}'.format(routine)
+        if not os.path.isdir(err_dir):
+            os.makedirs(err_dir)
 
         # RUN tests
         if client is None:
@@ -1108,7 +1133,7 @@ class Project(object):
             err = _run_tests(1, pars, timeout)[0]
             
             # debug - write test to file with err as docstring
-            fl = 'test_{:s}_{:s}.py'.format(client, routine)
+            fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
             _save_test(fl, err, pars[0])
             return
 
@@ -1116,13 +1141,10 @@ class Project(object):
         # write output as verbatim function with error traceback as docstring
         fail_file = self._get_file_name('fail', subtype=routine)
         errs = list(errs)
+        
         # if no errors to report, return
-        if not any([e != '' and type(e) is str for e in errs]): 
+        if not any([e != '' for e in errs]): 
             return
-        # error file
-        err_dir = 'failed_{:}'.format(routine)
-        if not os.path.isdir(err_dir):
-            os.makedirs(err_dir)
 
         for err, cl, lns in zip(errs, self.clientlist, pars):
             # characterise status
@@ -1523,6 +1545,8 @@ class PythonFile(BaseFile):
 # Exceptions
 class ComparisonError(Exception):
     pass
+class UnicityError(Exception):
+    pass
 
 def gev(x,*pars): 
     c,scale = pars
@@ -1608,6 +1632,25 @@ def _run_test(lns):
         err += str(sys.exc_info()[0])
     return (i,err)
 def _save_test(fl, err, lns):
+    if type(err) is int:
+        # test suite did not run (various reasons)
+        fp = open(fl,'w')
+        fp.write('failure code {:d}: '.format(err))
+        if err == -1:
+            fp.write('no file')
+        elif err == -2:
+            fp.write('no function/method')
+        elif err == -3:
+            fp.write('syntax errors')
+        elif err == -4:
+            fp.write('timeout when running code')
+        else:
+            raise 'failure code not recognised'
+        fp.close()
+        return
+    elif err == '':
+        return
+
     fp = open(fl,'w', encoding='utf-8')
         # error
     fp.write('r\'\'\'\n')

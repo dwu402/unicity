@@ -58,6 +58,6 @@ def test_method_multiprocessing():
 if __name__ == "__main__":
     test_simple_method()
 
-    test_method_specific_client()
+    #test_method_specific_client()
 
-    test_method_multiprocessing()
+    #test_method_multiprocessing()
