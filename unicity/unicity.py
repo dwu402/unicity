@@ -14,9 +14,6 @@ from fnmatch import fnmatch
 from difflib import SequenceMatcher
 Image.MAX_IMAGE_PIXELS = 1000000000
 
-# to do list:
-# - try Jaro distance
-
 # General classes
 class Portfolio(object):
     ''' Class for individual client file collection.
@@ -1176,65 +1173,79 @@ class FunctionVisitor(ast.NodeVisitor):
         self.import_froms = []
         self.function_import_froms = []
         self.all_calls = []
+        self.all_keywords = []
         self.in_class = None
         self.reserved = {'for':0,'while':0,'if':0,'else':0,'and':0,
-        'break':0,'continue':0,'or':0,'not':0,'tryexcept':0}
+        'break':0,'continue':0,'or':0,'not':0,'tryexcept':0,'import':0,
+        'import_from':0}
     def visit_Call(self,node):
         ''' Save callable name on visit to callable.
         '''
         try:
             self.funcs.append(node.func.id)
             self.all_calls.append(node.func.id)
+            self.all_keywords.append(node.func.id)
         except AttributeError:
             self.methods.append(node.func.attr)
             self.all_calls.append(node.func.attr)
+            self.all_keywords.append(node.func.attr)
         self.generic_visit(node)
     def visit_For(self,node):
         ''' Save use of For loop.
         '''
         self.reserved['for'] += 1
+        self.all_keywords.append('for')
         self.generic_visit(node)
     def visit_While(self,node):
         ''' Save use of While loop.
         '''
         self.reserved['while'] += 1
+        self.all_keywords.append('while')
         self.generic_visit(node)
     def visit_If(self,node):
         ''' Save use of If conditional.
         '''
         self.reserved['if'] += 1
+        self.all_keywords.append('if')
         if len(node.orelse) > 0:
             self.reserved['else'] += 1
+            self.all_keywords.append('else')
         self.generic_visit(node)
     def visit_And(self,node):
         ''' Save use of And bool operator.
         '''
         self.reserved['and'] += 1
+        self.all_keywords.append('and')
         self.generic_visit(node)
     def visit_Or(self,node):
         ''' Save use of Or bool operator.
         '''
         self.reserved['or'] += 1
+        self.all_keywords.append('or')
         self.generic_visit(node)
     def visit_Not(self,node):
         ''' Save use of Not bool operator.
         '''
         self.reserved['not'] += 1
+        self.all_keywords.append('not')
         self.generic_visit(node)
     def visit_Break(self,node):
         ''' Save use of Break.
         '''
         self.reserved['break'] += 1
+        self.all_keywords.append('break')
         self.generic_visit(node)
     def visit_Continue(self,node):
         ''' Save use of Continue.
         '''
         self.reserved['continue'] += 1
+        self.all_keywords.append('continue')
         self.generic_visit(node)
     def visit_TryExcept(self,node):
         ''' Save use of Try/Except.
         '''
         self.reserved['tryexcept'] += 1
+        self.all_keywords.append('tryexcept')
         self.generic_visit(node)
     def visit_Name(self, node):
         ''' Got to track these in case of visit to Error.
@@ -1264,7 +1275,9 @@ class FunctionVisitor(ast.NodeVisitor):
             self.base_obj = node.bases[0].id
         except IndexError:
             self.base_obj = "classic class"
+        n_keywords = len(self.all_keywords)
         self.generic_visit(node)
+        self.classes[cl.name].all_keywords = self.all_keywords[n_keywords:]
         self.classes[cl.name].lineno.append(self.lineno)
         self.in_class = None
     def visit_FunctionDef(self,node):
@@ -1286,8 +1299,10 @@ class FunctionVisitor(ast.NodeVisitor):
         self.methods = []
         self.names = []
         self.function_import_froms = []
+        n_keywords = len(self.all_keywords)
         self.generic_visit(node)                            # 'visit' the definition
         func.names = self.names
+        func.all_keywords = self.all_keywords[n_keywords:]
         func.funcs = self.funcs                             # function calls
         func.methods = self.methods                         # method calls
         func.import_froms = self.function_import_froms
@@ -1300,6 +1315,8 @@ class FunctionVisitor(ast.NodeVisitor):
     def visit_ImportFrom(self, node):
         ''' Save line number of import statements.
         '''
+        self.reserved['import_from'] += 1
+        self.all_keywords.append('import_from')
         self.import_lines.append(node.lineno-1)
         for name in node.names:
             self.import_froms.append([node.module, name.name])
@@ -1307,6 +1324,8 @@ class FunctionVisitor(ast.NodeVisitor):
     def visit_Import(self, node):
         ''' Save line number of import statements.
         '''
+        self.reserved['import'] += 1
+        self.all_keywords.append('import')
         self.import_lines.append(node.lineno-1)
     def generic_visit(self, node):
         ''' Save line number on generic visit.
@@ -1438,6 +1457,7 @@ class PythonFile(BaseFile):
         self.import_lines = fv.import_lines
         self.import_froms = fv.import_froms
         self.all_calls = fv.all_calls
+        self.all_keywords = fv.all_keywords
         self.reserved = fv.reserved
         # post-processing 
         self.get_user_funcs()
@@ -1713,7 +1733,103 @@ def compare_command_freq(file1, file2, template, name):
         dissimilar = 1.
 
     return 1.-similar/(similar+dissimilar)
+def jaro(s, t):
+    '''Jaro distance between two strings.
+    
+        Implementation from https://rosettacode.org/wiki/Jaro_distance#Python
+    '''
+    s_len = len(s)
+    t_len = len(t)
+ 
+    if s_len == 0 and t_len == 0:
+        return 1
+ 
+    match_distance = (max(s_len, t_len) // 2) - 1
+ 
+    s_matches = [False] * s_len
+    t_matches = [False] * t_len
+ 
+    matches = 0
+    transpositions = 0
+ 
+    for i in range(s_len):
+        start = max(0, i - match_distance)
+        end = min(i + match_distance + 1, t_len)
+ 
+        for j in range(start, end):
+            if t_matches[j]:
+                continue
+            if s[i] != t[j]:
+                continue
+            s_matches[i] = True
+            t_matches[j] = True
+            matches += 1
+            break
+ 
+    if matches == 0:
+        return 0
+ 
+    k = 0
+    for i in range(s_len):
+        if not s_matches[i]:
+            continue
+        while not t_matches[k]:
+            k += 1
+        if s[i] != t[k]:
+            transpositions += 1
+        k += 1
+ 
+    return ((matches / s_len) +
+            (matches / t_len) +
+            ((matches - transpositions / 2) / matches)) / 3
+def compare_jaro(file1, file2, template, name):
+    ''' Compute similarity of two Python callable sets based on Jaro distance.
 
+        Parameters:
+        -----------
+        file1 : File
+            Python File object for client 1.
+        file2 : File
+            Python File object for client 2.
+        template : File
+            Python File object for template file.
+        name : str
+            Routine name for comparison. If none, comparison operates on entire file.
+
+        Returns:
+        --------
+        dist : float
+            Float between 0 and 1 indicating degree of similarity (0 = highly similar,
+            1 = highly dissimilar).
+    '''
+    # convert ordered callable set to string
+    if name is None:
+        all_keywords1 = file1.all_keywords
+        all_keywords2 = file2.all_keywords
+        if template is not None:
+            all_keywords0 = template.all_keywords
+    else:
+        all_keywords1 = file1.functions[name].all_keywords
+        all_keywords2 = file2.functions[name].all_keywords
+        if template is not None:
+            all_keywords0 = template.functions[name].all_keywords
+        
+    # remove template content if given
+    if template is not None:
+        for kw0 in all_keywords0:
+            try:
+                all_keywords1.remove(kw0)
+            except ValueError:
+                pass
+            try:
+                all_keywords2.remove(kw0)
+            except ValueError:
+                pass
+
+    # compute similarity
+    similar = jaro(all_keywords1, all_keywords2)
+    
+    return 1.-similar
 def _get_client_code(client, import_froms):
     '''
     '''
@@ -1775,4 +1891,4 @@ def isiterable(x):
         return True
     except TypeError:
         return False
-builtin_compare_routines = {'command_freq':compare_command_freq}
+builtin_compare_routines = {'command_freq':compare_command_freq,'jaro':compare_jaro}
