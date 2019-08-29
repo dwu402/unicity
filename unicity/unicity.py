@@ -24,9 +24,7 @@ except:
 
 # to do list:
 # - comparisons to prior years
-# - move summary of test output to new file
 # - other distance metrics: permutation vs. combination
-# - check for find-replace evidence in comments
 # - does similarity metric need to be collapsed for smaller code samples? i.e.,
 #   similarity of long code weighted more than similarity of short code?
 
@@ -792,6 +790,8 @@ class Project(object):
 
             Parameters:
             -----------
+            comparison : unicity.Comparison
+                Comparison object produced by Project.compare.
             client : str
                 Name of client to highlight or 'anon' for anonymised report.
             save : str
@@ -829,7 +829,7 @@ class Project(object):
         
         # generate plot
         comparison._plot(self, save, client)
-    def compare(self, routine, metric = 'command_freq', ncpus = 1, template = None):
+    def compare(self, routine, metric = 'command_freq', ncpus = 1, template = None, prior_project = None):
         ''' Compares pairs of portfolios for similarity between implemented Python routine.
 
             Parameters:
@@ -845,11 +845,15 @@ class Project(object):
                 Number of CPUs to use when running comparisons.
             template : str (optional)
                 File path to Python template file for referencing the comparison.
+            prior_project : unicity.Project
+                Project object for different cohort. Check current cohort for similarities with 
+                previous. Comparisons will not be made between clients of the previous project.
             
             Returns:
             --------
             c : unicity.Comparison
                 Object containing comparison information.
+
             Notes:
             ------
             A template file is specified when Python files are likely to exhibit similarity
@@ -902,8 +906,14 @@ class Project(object):
             assert os.path.isfile(template), 'cannot find template file {:s}'.format(template)
             template = PythonFile(template, zipfile=None)
 
+        # preparation for prior project
+        if prior_project is not None:
+            prior_clientlist = prior_project.clientlist
+        else:
+            prior_clientlist = []
+
         # create comparison pairs
-        n = len(self.clientlist)
+        n = len(self.clientlist) + len(prior_clientlist)
         pairs = [[[i*1,j*1] for j in range(i+1,n)] for i in range(n)]
         pairs = list(chain(*pairs))
 
@@ -922,7 +932,7 @@ class Project(object):
             funcname = obj + '.' + func
         else:
             funcname = func
-        for cl in self.clientlist:
+        for cl in self.clientlist + prior_clientlist:
             try:
                 cl.portfolio.files[fl]
             except KeyError:
@@ -933,8 +943,10 @@ class Project(object):
             cl.portfolio.files[fl]._projzip = None
 
         # jobs to run
-        fls1 = [self.clientlist[i].portfolio.files[fl] for i,j in pairs]
-        fls2 = [self.clientlist[j].portfolio.files[fl] for i,j in pairs]
+        allclientlist = self.clientlist + prior_clientlist
+        fls1 = [allclientlist[i].portfolio.files[fl] for i,j in pairs]
+        fls2 = [allclientlist[j].portfolio.files[fl] for i,j in pairs]
+        
         funcs = [funcname]*len(fls1)
         fls0 = [template]*len(fls1)
         pars = zip(fls1,fls2,funcs,fls0)
