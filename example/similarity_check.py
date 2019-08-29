@@ -1,6 +1,6 @@
 
 import sys
-sys.path.append(r'E:\code\unicity')
+sys.path.append(r'D:\code\unicity')
 from unicity.unicity import Project 
 
 def similarity_check():
@@ -30,8 +30,8 @@ def similarity_check_prior_project():
     proj.similarity_report(comp)
 
 if __name__ == "__main__":
-    #similarity_check()
+    similarity_check()
     
-    #similarity_check_with_template()
+    similarity_check_with_template()
 
     similarity_check_prior_project()

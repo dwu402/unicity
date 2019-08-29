@@ -1,6 +1,6 @@
-import os, ast, zipfile, sys, traceback, re, shutil, glob, inspect
+import os, ast, zipfile, sys, traceback, re, glob, inspect
 import numpy as np
-from itertools import groupby, starmap
+from itertools import starmap
 from functools import partial
 from copy import copy
 from itertools import chain
@@ -13,17 +13,8 @@ from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
 Image.MAX_IMAGE_PIXELS = 1000000000
-pypdf_import_fail = False
-try: 
-    from PyPDF2 import PdfFileReader, PdfFileWriter
-except:
-    try:
-        from pyPdf import PdfFileReader, PdfFileWriter
-    except:
-        pypdf_import_fail = True
 
 # to do list:
-# - comparisons to prior years
 # - other distance metrics: permutation vs. combination
 # - does similarity metric need to be collapsed for smaller code samples? i.e.,
 #   similarity of long code weighted more than similarity of short code?
@@ -164,9 +155,11 @@ class Comparison(object):
         D = self.matrix
         
         # process distance matrix
-        n = len(proj.clientlist)
+        allclientlist = proj.clientlist+self.prior_clientlist
+        n = len(allclientlist)
         k = 0; Ds = np.zeros(int((n-1)*n/2))
         for i in range(n):
+            D[i,i] = 0.
             for j in range(i+1,n):
                 D[j,i] = D[i,j]
                 Ds[k] = D[i,j]
@@ -189,6 +182,12 @@ class Comparison(object):
         ax2b = fig.add_axes([0.3,0.705,0.6,0.09*0.71])
         axmatrix = fig.add_axes([0.3,0.1+0.6*0.29,0.6,0.6*0.71])
         axbar = fig.add_axes([0.1, 0.1, 0.8, 0.15])
+
+        # compute appropriate font size
+        ax_inches = 0.6*8.27     # axis dimension in inches
+        font_inches = ax_inches/n   # font size in inches
+        fs = int(1.2*font_inches*72)  # font size in points
+        fs = np.min([fs, 5])
         
         # plotting
         Z1 = sch.dendrogram(Y1, orientation='left', ax=ax1)
@@ -199,7 +198,7 @@ class Comparison(object):
         idx2 = Z2['leaves']
         # get client similarity if requested
         if client not in [None, 'anon']:
-            ix = [i for i,cl in enumerate(proj.clientlist) if cl.name == client][0]
+            ix = [i for i,cl in enumerate(allclientlist) if cl.name == client][0]
             max_similarity = np.min([D[j,ix] for j in range(D.shape[0]) if j!= ix])
         # shuffle matrix for clustering
         D = D[idx1,:]
@@ -257,15 +256,17 @@ class Comparison(object):
         dy = ax1b.get_ylim()[1]/n
         x0 = ax1b.get_xlim()[1]
         for i,idx in enumerate(Z1['leaves']):
-            name = proj.clientlist[idx].name
+            name = allclientlist[idx].name
             col = 'k'
             if client is not None:
                 if name != client:
                     name = '*'*np.random.randint(10,15)
                 else:
                     col = 'r'
+            if idx > len(proj.clientlist):
+                col = 'g'
                 
-            ax1b.text(0.9*x0, (i+0.5)*dy, name, size=5, color = col, ha='right', va='center')
+            ax1b.text(0.9*x0, (i+0.5)*dy, name, size=fs, color = col, ha='right', va='center')
             if i % dn == 0:
                 ax1b.axhline(i*dy, color = 'k', linestyle='-', linewidth=0.25)
                 ax1.axhline(i*dy, color = 'k', linestyle='-', linewidth=0.25)
@@ -273,7 +274,7 @@ class Comparison(object):
         dx = ax2b.get_xlim()[1]/n
         y0 = ax2b.get_ylim()[0]
         for i,idx in enumerate(Z2['leaves']):
-            name = proj.clientlist[idx].name
+            name = allclientlist[idx].name
             col = 'k'
             if client is not None:
                 if name != client:
@@ -282,9 +283,11 @@ class Comparison(object):
                     col = 'r'
                     lbl = 'score - {:3.2f}'.format(max_similarity)
                     axbar.axvline(max_similarity,color='r',linestyle = '-', label=lbl)
+            if idx > len(proj.clientlist):
+                col = 'g'
             axbar.legend()
                 
-            ax2b.text((i+0.5)*dx, 0.95*y0, name, size=5, color = col, ha='center', 
+            ax2b.text((i+0.5)*dx, 0.95*y0, name, size=fs, color = col, ha='center', 
                 va='bottom', rotation=-90.)
             if i % dn == 0:
                 ax2b.axvline(i*dx, color = 'k', linestyle='-', linewidth=0.25)
@@ -800,26 +803,11 @@ class Project(object):
         '''
         # interpret input routine
         fl, obj, func = split_at_delimiter(comparison.routine)
-        # check for misspellings
-        if fl not in self._expecting:
-            raise UnicityError("'{:s}' not an expected client file".format(fl))
         if func is None:
             func = fl.split('.')[0]
         elif obj is not None:
             func = obj + '.' + func
 
-        # check for misspellings
-        presence = 0.
-        for cl in self.clientlist:
-            try:
-                cl.portfolio.files[fl].functions[func]
-                presence += 1
-            except:
-                pass
-        presence = presence/len(self.clientlist)
-        if presence < 0.1:
-            raise UnicityError("'{:s}' does not appear frequently in '{}'".format(func,fl))
-        
         # set output name
         clientstr = ''
         if client is not None:
@@ -913,13 +901,15 @@ class Project(object):
             prior_clientlist = []
 
         # create comparison pairs
-        n = len(self.clientlist) + len(prior_clientlist)
-        pairs = [[[i*1,j*1] for j in range(i+1,n)] for i in range(n)]
+        n1 = len(self.clientlist)
+        n2 = len(prior_clientlist)
+        # pairs excludes matches between clients in prior list
+        pairs = [[[i*1,j*1] for j in range(i+1,n1+n2) if not (i>n1 and j>n1)] for i in range(n1+n2)]
         pairs = list(chain(*pairs))
 
         # empty comparison matrix 
         c = Comparison()
-        c.matrix = np.zeros((n,n))
+        c.matrix = np.zeros((n1+n2,n1+n2))+4.
         if callable(metric):
             c.metric = 'user_metric_'+metric.__name__
         else:
@@ -928,10 +918,28 @@ class Project(object):
 
         # determine function type and eligibility
         fl, obj, func = split_at_delimiter(routine)
+        # check for misspellings
+        if fl not in self._expecting:
+            raise UnicityError("'{:s}' not an expected client file".format(fl))
         if obj is not None:
             funcname = obj + '.' + func
         else:
             funcname = func
+
+        # check for misspellings
+        if funcname is not None:
+            presence = 0.
+            for cl in self.clientlist:
+                try:
+                    cl.portfolio.files[fl].functions[funcname]
+                    presence += 1
+                except:
+                    pass
+            presence = presence/len(self.clientlist)
+            if presence < 0.1:
+                raise UnicityError("'{:s}' does not appear frequently in '{}'".format(funcname,fl))
+        
+        
         for cl in self.clientlist + prior_clientlist:
             try:
                 cl.portfolio.files[fl]
@@ -991,6 +999,7 @@ class Project(object):
             except AttributeError:
                 pass
 
+        c.prior_clientlist = prior_clientlist
         return c
     # testing methods\
     def test(self, routine, ncpus = 1, language='python', client=None, timeout = None, **kwargs):
