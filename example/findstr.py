@@ -8,7 +8,7 @@ def find_string():
     proj = Project('example_project.zip', expecting=['functions.py', 'tasks.py'])
     
     # Annie Alvis' submission contains the word 'floders', which
-    # is an unusual typo. Surely no one else has the same one.
+    # is an unusual typo. Surely no one else has the same one...
     proj.findstr('floders', verbose=True)
 
 def find_string_in_location():
