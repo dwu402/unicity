@@ -1,4 +1,4 @@
-import os, ast, zipfile, sys, traceback, re, shutil, glob
+import os, ast, zipfile, sys, traceback, re, shutil, glob, inspect
 import numpy as np
 from itertools import groupby, starmap
 from functools import partial
@@ -373,6 +373,7 @@ class Project(object):
         test
     '''
     def __init__(self, project, expecting, ignore = ['*'], cohort = None, root = None):
+        
         project = os.path.abspath(project)
         if os.path.isdir(project):
             self._projdir = project
@@ -392,6 +393,9 @@ class Project(object):
         self._expecting = expecting
         self._ignore_files = ignore
         self._run_test = False
+        frame = inspect.stack()[1]
+        module = inspect.getmodule(frame[0])
+        self._parent_script = module.__file__
         self.clientlist = []
         self.client = {}
         self.portfolio_status = {'complete':[],'partial':[],'absent':[]}
@@ -1001,8 +1005,7 @@ class Project(object):
         '''
         # check if test_suite.py exists
         wd = os.getcwd()
-        self._tsfile = wd+os.sep+'test_suite.py'
-        assert os.path.isfile(self._tsfile), 'no file \'test_suite.py\' to run'
+        self._tsfile = self._parent_script
         assert client is None or client in self.client.keys(), 'no such client \'{}\''.format(client)
         assert not (ncpus > 1 and timeout is not None), 'timeout only implemented for serial (ncpus=1)'
 
@@ -1041,20 +1044,12 @@ class Project(object):
         
         # PREPARE for tests
         # parse test_suite and check if unit test exists
-        fl,obj,func = split_at_delimiter(routine)
         ts = PythonFile(self._tsfile, None)
-        if obj is None:
-            ftest = 'test_'+func
-        else:
-            ftest = 'test_'+obj+'_'+func
-        #ftest = ftest.lower()
-        if ftest not in ts.functions.keys():
-            raise ValueError('no unit test \'{:s}\' in \'test_suite.py\''.format(ftest))
-
+        
         # code lines for unit test
         utlns = []
         # user classes called by unit test
-        for uclass in ts.functions[ftest].user_classes:
+        for uclass in ts.functions[routine].user_classes:
             mthds = ts.classes[uclass].methods.values()
             if len(mthds) == 0:
                 utlns += ts.classes[uclass].ln
@@ -1063,10 +1058,16 @@ class Project(object):
                 for mthd in mthds:
                     utlns += mthd.lns
         # user functions called by unit test
-        for uf in ts.functions[ftest].user_funcs:
+        for uf in ts.functions[routine].user_funcs:
             utlns.extend(ts.functions[uf].lns)
-        # unit test
-        utlns.extend(ts.functions[ftest].lns)
+        # unit test - remove import_froms calling out to test file
+        lns = []
+        for ln in ts.functions[routine].lns:
+            if 'from ' in ln and ' import ' in ln:
+                if ln.split('from ')[1].split(' import')[0].strip()+'.py' in self._expecting:
+                    continue
+            lns.append(ln)
+        utlns.extend(lns)
 
         # CONSTRUCT tests
         pars = []
@@ -1075,14 +1076,14 @@ class Project(object):
         else:
             cls_ = [self.client[client]]
         for cl in cls_:
-            # check special cases preventing a test being run
-            availability = self._routine_availability(cl, routine)
-            if availability != 0:
-                pars.append(availability)
-                continue
 
             # construct testing code
-            clns = _get_client_code(cl, routine)
+            clns = _get_client_code(cl, ts.functions[routine].import_froms)
+
+            # catch errors
+            if type(clns) == int:
+                pars.append(clns)
+                continue
 
             # unit test call
             # (note: try/finally to counter directory changes coded by clients)
@@ -1090,7 +1091,7 @@ class Project(object):
             lns.append('try:')
             lns.append('    from os import getcwd,chdir')
             lns.append('    cwd = getcwd()')
-            lns.append('    {:s}()'.format(ftest))
+            lns.append('    {:s}()'.format(routine))
             lns.append('finally:')
             lns.append('    chdir(cwd)')
             pars.append([ln.replace('\t','    ').rstrip()+'\n' for ln in lns])
@@ -1107,21 +1108,19 @@ class Project(object):
             err = _run_tests(1, pars, timeout)[0]
             
             # debug - write test to file with err as docstring
-            fl = 'test_{:s}_{:s}.py'.format(client, ftest)
+            fl = 'test_{:s}_{:s}.py'.format(client, routine)
             _save_test(fl, err, pars[0])
             return
 
         # PARSE test output
         # write output as verbatim function with error traceback as docstring
-        fail_file = self._get_file_name('fail', subtype=func)
+        fail_file = self._get_file_name('fail', subtype=routine)
         errs = list(errs)
         # if no errors to report, return
         if not any([e != '' and type(e) is str for e in errs]): 
             return
-        if obj is not None:
-            func = obj + '.' + func
         # error file
-        err_dir = 'failed_{:}'.format(func)
+        err_dir = 'failed_{:}'.format(routine)
         if not os.path.isdir(err_dir):
             os.makedirs(err_dir)
 
@@ -1130,7 +1129,7 @@ class Project(object):
             if type(err) is int:
                 # test suite did not run (various reasons)
                 cl.failed_test_suite = err
-                fp = open(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, ftest),'w')
+                fp = open(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine),'w')
                 fp.write('failure code {:d}: '.format(err))
                 if err == -1:
                     fp.write('no file')
@@ -1155,7 +1154,7 @@ class Project(object):
             cl.failed_test_suite = True
 
             # write fail file
-            fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, ftest)
+            fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
             _save_test(fl, err, lns)
 class FunctionVisitor(ast.NodeVisitor):
     ''' Class to gather data on Python file.
@@ -1167,6 +1166,8 @@ class FunctionVisitor(ast.NodeVisitor):
         self.defs = {}
         self.classes = {}
         self.import_lines = []
+        self.import_froms = []
+        self.function_import_froms = []
         self.all_calls = []
         self.in_class = None
         self.reserved = {'for':0,'while':0,'if':0,'else':0,'and':0,
@@ -1277,10 +1278,12 @@ class FunctionVisitor(ast.NodeVisitor):
         self.funcs = []
         self.methods = []
         self.names = []
+        self.function_import_froms = []
         self.generic_visit(node)                            # 'visit' the definition
         func.names = self.names
         func.funcs = self.funcs                             # function calls
         func.methods = self.methods                         # method calls
+        func.import_froms = self.function_import_froms
         func.lineno.append(self.lineno)                     # final line
         if self.in_class is not None:
             funcname = self.in_class + '.' + func.name
@@ -1291,6 +1294,9 @@ class FunctionVisitor(ast.NodeVisitor):
         ''' Save line number of import statements.
         '''
         self.import_lines.append(node.lineno-1)
+        for name in node.names:
+            self.import_froms.append([node.module, name.name])
+            self.function_import_froms.append([node.module, name.name])
     def visit_Import(self, node):
         ''' Save line number of import statements.
         '''
@@ -1309,6 +1315,8 @@ class FunctionInfo(object):
     def __init__(self, **kwargs):
         for k in kwargs.keys():
             self.__setattr__(k, kwargs[k])
+        self.depends_class = None
+        self.depends_func = None
     def __repr__(self):
         try:
             return self.name
@@ -1322,6 +1330,8 @@ class ClassInfo(object):
         self.methods = {}
         for k in kwargs.keys():
             self.__setattr__(k, kwargs[k])
+        self.depends_class = None
+        self.depends_func = None
     def __repr__(self):
         try:
             return self.name
@@ -1419,6 +1429,7 @@ class PythonFile(BaseFile):
                 obj,func = k.split('.')
                 self.classes[obj].methods.update({func:self.functions[k]})
         self.import_lines = fv.import_lines
+        self.import_froms = fv.import_froms
         self.all_calls = fv.all_calls
         self.reserved = fv.reserved
         # post-processing 
@@ -1473,6 +1484,7 @@ class PythonFile(BaseFile):
                     for ufunc in self.functions[obj+'.'+mthd].funcs+self.functions[obj+'.'+mthd].names:
                         if ufunc in clsks and ufunc not in func.user_classes:
                             func.user_classes.append(ufunc)
+            
             # recurse, checking if methods of user-defined classes call other user-defined classes
             recurseCount = 0
             classCount = len(func.user_classes)
@@ -1694,37 +1706,36 @@ def compare_command_freq(file1, file2, template, name):
         dissimilar = 1.
 
     return 1.-similar/(similar+dissimilar)
-def _get_client_code(client, routine):
+def _get_client_code(client, import_froms):
     '''
     '''
-    fl,obj,func = split_at_delimiter(routine)
-    fnfli = client.portfolio.files[fl]
-    # client's code for running
-        # imports 
-    clns = [fnfli.lns[iln].lstrip() for iln in fnfli.import_lines]
-        # classes
-    if obj is not None:
-        func = obj + '.' + func
-    for uclass in fnfli.functions[func].user_classes:
-        mthds = fnfli.classes[uclass].methods.values()
-        if len(mthds) == 0:
-            clns += fnfli.classes[uclass].ln
-        else:
-            clns += [fnfli.classes[uclass].ln[0],]
-            for mthd in mthds:
-                clns += mthd.lns
-    if obj is not None:
-        clns += [fnfli.classes[obj].ln[0],]
-        for mthd in fnfli.classes[obj].methods.values():
-            clns += mthd.lns
-        # functions
-    for uf in fnfli.functions[func].user_funcs:
-        clns += fnfli.functions[uf].lns
-        # test function
-    if obj is None:
-        clns += fnfli.functions[func].lns
+    ilns = []
+    clns = []
+    included_files = []
+    
+    for import_from in import_froms:
+        fl,item = import_from
+        # import not client code, write out verbatim
+        if fl+'.py' not in client.portfolio.files.keys():
+            ilns.append('from {:s} import {:s}'.format(fl, item))
+            continue
 
-    return clns
+        if fl+'.py' in included_files:
+            continue
+        else:
+            included_files.append(fl+'.py')
+
+        # import is a custom, gather client code
+        fnfli = client.portfolio.files[fl+'.py']
+        if fnfli.tree == -1:
+            return -3
+        clns += fnfli.lns
+        
+    # client file not found, return empty
+    if len(included_files) == 0:
+        return -1
+    else:
+        return ilns+clns
 def compare(file1, file2, name, template, compare_routine):
     ''' Compute similarity of two Python functions.
     '''
