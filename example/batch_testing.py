@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r'E:\code\unicity')
+sys.path.append(r'D:\code\unicity')
 from unicity.unicity import Project 
 
 def test_function():
@@ -66,10 +66,10 @@ def test_and_summarise():
     proj.summarise('example_project.log')
 
 if __name__ == "__main__":
-    #test_simple_method()
+    test_simple_method()
 
     #test_method_specific_client()
 
     #test_method_multiprocessing()
     
-    test_and_summarise()
+    #test_and_summarise()
