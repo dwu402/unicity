@@ -574,9 +574,6 @@ class Project(object):
             if cl.failed_test_suite == -1:
                 # no file
                 self.test_status['missing file'].append(cl)
-            elif cl.failed_test_suite == -2:
-                # no routine
-                self.test_status['missing routine'].append(cl)
             elif cl.failed_test_suite == -3:
                 # syntax errors in code
                 self.test_status['compile error'].append(cl)
@@ -705,7 +702,6 @@ class Project(object):
             fp.write('-----\n')
             fp.write('{:d} clients passed the test suite\n'.format(len(self.test_status['passed'])))
             fp.write('{:d} clients failed the test suite\n'.format(len(self.test_status['failed'])))
-            fp.write('{:d} clients did not have function (no test run)\n'.format(len(self.test_status['missing routine'])))
             fp.write('{:d} clients had syntax errors (no test run)\n'.format(len(self.test_status['compile error'])))
             fp.write('{:d} clients had no file (no test run)\n'.format(len(self.test_status['missing file'])))
         
@@ -734,7 +730,6 @@ class Project(object):
         reports = [
             ['failed','FAILED TEST SUITE'],
             ['missing file',"FILE NOT INCLUDED IN PORTFOLIO"],
-            ['missing routine',"TEST FUNCTION NOT INCLUDED IN FILE"],
             ['compile error',"SYNTAX ERRORS DURING COMPILE"],
             ]
         for key, msg in reports:
@@ -1026,33 +1021,6 @@ class Project(object):
 
         self.__getattribute__('_test_{:s}'.format(language))(routine, ncpus, client, timeout, **kwargs)
         self._run_test = True
-    def _routine_availability(self, client, routine):
-        ''' check if flags should be returned indicating routine cannot be tested
-        '''
-        fl,obj,func = split_at_delimiter(routine)
-
-        # file not submitted
-        if fl not in client.portfolio.files.keys():
-            return -1
-
-        # routine not present
-        fnfli = client.portfolio.files[fl]
-        
-        # syntax errors in ast
-        if fnfli.tree == -1:
-            return -3
-
-        if obj is not None:
-            if obj not in fnfli.classes.keys():
-                # method not present
-                return -2
-        else:
-            if func not in fnfli.functions.keys():
-                # function not present
-                return -2
-        
-        # no reason to not run test
-        return 0
     def _test_python(self, routine, ncpus, client, timeout):
         ''' Test suite for Python files.
         '''
@@ -1155,8 +1123,6 @@ class Project(object):
                 fp.write('failure code {:d}: '.format(err))
                 if err == -1:
                     fp.write('no file')
-                elif err == -2:
-                    fp.write('no function/method')
                 elif err == -3:
                     fp.write('syntax errors')
                 elif err == -4:
@@ -1638,8 +1604,6 @@ def _save_test(fl, err, lns):
         fp.write('failure code {:d}: '.format(err))
         if err == -1:
             fp.write('no file')
-        elif err == -2:
-            fp.write('no function/method')
         elif err == -3:
             fp.write('syntax errors')
         elif err == -4:
