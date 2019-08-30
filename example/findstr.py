@@ -1,6 +1,6 @@
 
 import sys
-sys.path.append(r'D:\code\unicity')
+sys.path.append(r'E:\code\unicity')
 from unicity.unicity import Project 
 
 def find_string():
@@ -32,5 +32,5 @@ def find_string_in_location():
 if __name__ == "__main__":
     find_string()
 
-    #find_string_in_location()
+   #find_string_in_location()
     

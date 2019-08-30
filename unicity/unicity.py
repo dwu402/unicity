@@ -7,6 +7,8 @@ from itertools import chain
 from multiprocessing import Pool, Process, Manager
 from matplotlib import pyplot as plt
 import scipy.cluster.hierarchy as sch
+from scipy.optimize import curve_fit
+from scipy.stats import genextreme
 from scipy.spatial.distance import squareform
 from fuzzywuzzy import fuzz
 from PIL import Image
@@ -36,35 +38,26 @@ class Cohort(object):
         defines column names and must at least contain a 'name' column. Client information
         is given on separate rows.
         
-        For example, the contents of 'cohort.csv'
+        For example, the contents of 'cohort.txt'
 
-        name, id, email, gpa
-        bondjames, 007, bondjames@gmail.com, 4.7
-        thatchermargaret, 008, thm@hotmail.com, 6.2
-        aquinasthomas, 009, aquinas@gmail.com, 5.9
-        curiemarie, 010, curie@gmail.com, 9.0
+        name, firstname, surname, email
+        johnsonjunko, junko, johnson, j.johnson@unicity.co.nz
+        trosttrisha, trisha, trost, t.trost@unicity.co.nz
+        romoricki, ricki, romo, r.romo@unicity.co.nz
+        mccardellmirta, mirta,mccardell, m.mccardell@unicity.co.nz
 
-        define a cohort of four clients. Each column is provisioned as a separate attribute 
-        of the Cohort object.
+        Each column is provisioned as a separate attribute of the Cohort object. If the
+        'email' attribute is present, this will be reported in output.
     '''
     def __init__(self, filename):
         self.filename = filename
-        self.parse_year()
-        self.load()
+        self._load()
     def __repr__(self):
         try:
             return '{:d}cohort'.format(self.year)
         except AttributeError:
             return 'cohort'
-    def parse_year(self):
-        ''' Attempts to parse year information from cohort file path.
-        '''
-        yrs = re.findall('(\d{4})', self.filename)
-        if len(yrs) == 0:
-            self.year = None
-        else:
-            self.year = int(max(set(yrs), key=yrs.count))
-    def load(self):
+    def _load(self):
         ''' Load cohort data.
         '''
         if not os.path.isfile(self.filename):
@@ -132,9 +125,35 @@ class Client(object):
         except AttributeError:
             return '{:s}'.format(self.name)
 class Comparison(object):
-    def __init__(self, loadfile=None):
+    ''' A class for batch comparisons of code.
+
+        Parameters:
+        -----------
+        loadfile : str
+            File path to previously saved comparison object.
+        prior_project : unicity.Project (optional)
+            If comparison was constructed against a prior project, pass this
+            object to read prior client information.
+
+        
+        Attributes:
+        -----------
+        matrix : array-like
+            Distance matrix of similarities.
+        routine : str
+            Code unit for comparison in unicity string format.
+        prior_routine : str
+            Code unit for prior comparison in unicity string format.
+
+        Methods:
+        --------
+        save 
+            Write comparison data to file.
+
+    '''
+    def __init__(self, loadfile, prior_project=None):
         if loadfile is not None:
-            self._load(loadfile)
+            self._load(loadfile, prior_project)
     def __repr__(self):
         return 'compare: {:s} by {:s}'.format(self.routine, self.metric)
     def _plot(self, proj, savefile, client):
@@ -150,7 +169,7 @@ class Comparison(object):
         D = self.matrix
         
         # process distance matrix
-        allclientlist = proj.clientlist+self.prior_clientlist
+        allclientlist = proj.clientlist+self._prior_clientlist
         n = len(allclientlist)
         k = 0; Ds = np.zeros(int((n-1)*n/2))
         for i in range(n):
@@ -216,17 +235,14 @@ class Comparison(object):
         h = h/np.sum(h[:-1])/w
         axbar.bar(m[:-1], h[:-1], w, edgecolor = 'k', fc = (0,0,0,0), label='distribution of minimums')
         # find best fit GEV curve
-        from scipy.optimize import curve_fit
-        from scipy.stats import genextreme
-        
         try:
             pcut = 0.0
             i = np.argmin(abs(m-pcut))
             scale = np.sum(h[:-1])/np.sum(h[i:-1])
-            p = curve_fit(gev, m[i:-1], h[i:-1]*scale, [0.,0.1],
+            p = curve_fit(_gev, m[i:-1], h[i:-1]*scale, [0.,0.1],
                 bounds = ([0,0],[np.inf,np.inf]))[0]
             x1 = np.linspace(0,1,101)
-            axbar.plot(x1, gev(x1, *p), 'r:', label='best-fit Weibull')
+            axbar.plot(x1, _gev(x1, *p), 'r:', label='best-fit Weibull')
         except:
             axbar.plot([], [], 'r:', label='Weibull fitting failed')
             pass
@@ -299,7 +315,7 @@ class Comparison(object):
         ax0.text(0.5,0.95, 'comparing {:s} by {:s}'.format(self.routine, self.metric), ha = 'center', va = 'top')
         fig.savefig(savefile, dpi = 500)
         plt.close(fig)
-    def _load(self, loadfile):
+    def _load(self, loadfile, prior_project):
         ''' Loads a precomputed comparison file.
         '''
         fp = open(loadfile,'r')
@@ -307,22 +323,32 @@ class Comparison(object):
         n = int(ln[0])
         self.routine = ln[1]
         self.metric = ln[2]
+        try:
+            self.prior_routine = ln[3]
+        except IndexError:
+            self.prior_routine = None
         fp.close()
         # read matrix
         self.matrix = np.genfromtxt(loadfile, skip_header=1)
+        if prior_project is not None:
+            self._prior_clientlist = prior_project.clientlist
+        else:
+            self._prior_clientlist = []
     def save(self, savefile):
         ''' Saves a precomputed comparison file.
 
             Parameters:
             -----------
             savefile : str
-                Name of file to save comparison matrix.
+                Name of file to save similarity data.
         '''
         fp = open(savefile,'w')
         n = self.matrix.shape[0]
         # header data
         fp.write('{:d} '.format(n))                                  # number of clients
         fp.write((' {:s} {:s}').format(self.routine, self.metric))
+        if self.prior_routine is not None:
+            fp.write(' {:s}'.format(self.prior_routine))
         fp.write('\n')
         for i in range(n):
             for j in range(n):
@@ -357,16 +383,22 @@ class Project(object):
         portfolio_status : dict
             Contains completeness information about individual client portfolios.
         test_status : dict
-
+            Contains testing information about individual client portfolios.
         
         Methods:
         --------
-        compare
-        dump_docstrings
         findstr
+            Look for string instances in client portfolios.
+        dump_docstrings
+            Write docstring information to file.
+        compare
+            Compute similarity metrics between client portfolios.
         similarity_report
+            Produce a plot of similarity across the project.
         summarise
+            Output a summary of the project.
         test
+            Batch testing of the code.
     '''
     def __init__(self, project, expecting, ignore = ['*'], cohort = None, root = None):
         
@@ -437,7 +469,7 @@ class Project(object):
             if fnmatch(fl, ifl):
                 return
         # return on template matches
-        if max([check_fuzzy_ratio(fl, ignore) for ignore in self._ignore_files])>75:
+        if max([_check_fuzzy_ratio(fl, ignore) for ignore in self._ignore_files])>75:
             return
         # raise error
         raise TypeError('unexpected file: {:s}'.format(fl.split(os.sep)[-1]))
@@ -456,7 +488,7 @@ class Project(object):
             client.late = self._check_late(fl)
 
             # fuzzy string matching because people can't follow instructions
-            ratios = [check_fuzzy_ratio(fl, expect) for expect in self._expecting]
+            ratios = [_check_fuzzy_ratio(fl, expect) for expect in self._expecting]
 
             # accept above (arbitrary) threshold
             if max(ratios)>75:
@@ -466,7 +498,7 @@ class Project(object):
                 self._ignore(fl)
                 continue 
 
-            client.portfolio.files.update({fl0:File(fl, zf)})            # save file information
+            client.portfolio.files.update({fl0:_File(fl, zf)})            # save file information
         
         # sort clients alphabetically 
         self.clientlist = sorted(self.clientlist, key = lambda x: x.name)
@@ -579,6 +611,42 @@ class Project(object):
             elif not cl.failed_test_suite:
                 # passed test suite
                 self.test_status['passed'].append(cl)
+    def _split_at_delimiter(self, function, prior_project = None):
+        if function is None:
+            return None, None, None
+        if '/' not in function:
+            fl = function
+            obj = None
+            func = None                    
+        else:
+            fl, func = function.split('/')
+            if '.' not in func:
+                obj = None
+            else:
+                obj, func = func.split('.')
+
+        # check file exists
+        proj = self
+        if prior_project is not None:
+            proj = prior_project
+        if fl not in proj._expecting:
+            raise UnicityError("'{:s}' not an expected client file".format(fl))
+        
+        # check routine exists
+        funcname =  obj + '.' + func if obj is not None else func
+        if funcname is not None:
+            presence = 0.
+            for cl in self.clientlist:
+                try:
+                    cl.portfolio.files[fl].functions[funcname]
+                    presence += 1
+                except:
+                    pass
+            presence = presence/len(self.clientlist)
+            if presence < 0.1:
+                raise UnicityError("'{:s}' does not appear frequently in '{}'".format(funcname,fl))
+        
+        return fl, obj, func        
     # analysis methods
     def findstr(self, string, location=None, verbose = False, save=None):
         ''' Check portfolio for instances of string.
@@ -601,7 +669,7 @@ class Project(object):
                 Client objects whose portfolios contain the search string.
 
         '''
-        fl,obj,func = split_at_delimiter(location)
+        fl,obj,func = self._split_at_delimiter(location)
         if obj is not None:
             func = obj + '.' + func
         if save is not None:
@@ -667,12 +735,19 @@ class Project(object):
         if save is not None:
             fp.close()
         return found_clients
-    def summarise(self, summaryfile, verbose=False):
+    def summarise(self, save, verbose=False):
         ''' Create log file with portfolio information.
+
+            Parameters:
+            -----------
+            save : str
+                File path to save output summary.
+            verbose : bool (optional)
+                Print output to screen as well.
         '''
         self._check_test_status()
         # open log file
-        fp = open(summaryfile, 'w')
+        fp = open(save, 'w')
         fline = (80*"-")+'\n'
 
         # header
@@ -740,7 +815,7 @@ class Project(object):
 
         # optional print to screen
         if verbose:
-            with open(summaryfile, 'r') as fp:
+            with open(save, 'r') as fp:
                 lns = fp.readlines()
             
             for ln in lns:
@@ -751,11 +826,12 @@ class Project(object):
             Parameters:
             -----------
             routine : str
-                callable sequence in unicity format *file*/*function*, *file*/*class*.*method*
+                Callable sequence in unicity format {file}/{function}, or
+                {file}/{class}.{method}.
             save : str
-                name of file to write docstrings
+                File path to write docstrings.
         '''
-        fl,obj,func = split_at_delimiter(routine)
+        fl,obj,func = self._split_at_delimiter(routine)
         fp = open(save,'w')
         for cl in self.clientlist:
             fp.write('# {:s}\n'.format(cl.name_email))
@@ -790,14 +866,14 @@ class Project(object):
             -----------
             comparison : unicity.Comparison
                 Comparison object produced by Project.compare.
-            client : str
+            client : str (optional)
                 Name of client to highlight or 'anon' for anonymised report.
-            save : str
-                Name of output file (defaults to *client*_*function*.png).
+            save : str (optional)
+                Name of output file (default to {clientname}_{function}.png).
 
         '''
         # interpret input routine
-        fl, obj, func = split_at_delimiter(comparison.routine)
+        fl, obj, func = self._split_at_delimiter(comparison.routine)
         if func is None:
             func = fl.split('.')[0]
         elif obj is not None:
@@ -812,7 +888,8 @@ class Project(object):
         
         # generate plot
         comparison._plot(self, save, client)
-    def compare(self, routine, metric = 'command_freq', ncpus = 1, template = None, prior_project = None):
+    def compare(self, routine, metric = 'command_freq', ncpus = 1, template = None, 
+        prior_project = None, prior_routine = None):
         ''' Compares pairs of portfolios for similarity between implemented Python routine.
 
             Parameters:
@@ -820,18 +897,21 @@ class Project(object):
             routine : str
                 Callable sequence in unicity format for comparison at three levels: {file}, 
                 {file}/{function} or {file}/{class}.{method}.
-            metric : str, callable
+            metric : str, callable (optional)
                 Distance metric for determining similarity. See below for more information on
                 the different metrics available. Users can pass their own metric functions but
-                these must adhere to the specification below.
-            ncpus : int
-                Number of CPUs to use when running comparisons.
+                these must adhere to the specification below. (default 'command_freq')
+            ncpus : int (optional)
+                Number of CPUs to use when running comparisons. (default 1, single thread)
             template : str (optional)
                 File path to Python template file for referencing the comparison.
-            prior_project : unicity.Project
+            prior_project : unicity.Project (optional)
                 Project object for different cohort. Check current cohort for similarities with 
                 previous. Comparisons will not be made between clients of the previous project.
-            
+            prior_routine : str (optional)
+                Callable sequence in unicity format for comparison from prior_project. If not given,
+                will default to routine.
+
             Returns:
             --------
             c : unicity.Comparison
@@ -841,11 +921,11 @@ class Project(object):
             ------
             A template file is specified when Python files are likely to exhibit similarity
             due to portfolios developed from a common template. Each portfolio is compared 
-            to the template for similarity, and this is 'subtracted' from any similarity between
-            a pair of portfolios.
+            to the template for similarity, and this is 'subtracted' from any similarity 
+            between a pair of portfolios.
 
             Exercise caution when drawing conclusions of similarity between short code snippets as
-            this increases the likelihood of raising false positives.
+            this increases the likelihood of false positives. 
 
             Distance metrics:
             -----------------
@@ -853,6 +933,7 @@ class Project(object):
                 Commands counted include all callables (function/methods), control statements 
                 (if/elif/else), looping statements (for/while/continue/break), boolean operators 
                 (and/or/not) and try/except. 
+            jaro : Compares the order of the statements above for matches and transpositions.
 
             User-defined distance metrics:
             ------------------------------
@@ -867,8 +948,12 @@ class Project(object):
                     Python File object for client 2.
                 template : File
                     Python File object for template file.
-                name : str
-                    Routine name for comparison. If none, comparison operates on entire file.
+                name1 : str
+                    Routine name in first file for comparison. If not given, the comparison 
+                    is assumed to operate on entire file.
+                name2 : str
+                    Routine name in second file for comparison. If not given, the comparison 
+                    is assumed to operate on entire file.
 
                 Returns:
                 ~~~~~~~~
@@ -879,10 +964,16 @@ class Project(object):
             User metrics that raise exceptions are caught and passed, with the error message written
             to unicity_compare_errors.txt for debugging.
 
+            See examples/similarity_check.py for more details and examples.
         '''
         # check comparison metric available
         if not callable(metric):
             assert metric in builtin_compare_routines, "Unrecognized metric \'{:s}\'".format(metric)
+
+        # check prior routine only specified if prior project given
+        assert not (prior_routine is not None and prior_project is None), "must pass prior_project if you're going to pass prior_routine"
+        if prior_routine is None:
+            prior_routine = routine        
 
         # load template file
         if template is not None:
@@ -903,39 +994,24 @@ class Project(object):
         pairs = list(chain(*pairs))
 
         # empty comparison matrix 
-        c = Comparison()
+        c = Comparison(None)
         c.matrix = np.zeros((n1+n2,n1+n2))+4.
         if callable(metric):
             c.metric = 'user_metric_'+metric.__name__
         else:
             c.metric = metric
         c.routine = routine
+        c.prior_routine = prior_routine
 
         # determine function type and eligibility
-        fl, obj, func = split_at_delimiter(routine)
-        # check for misspellings
-        if fl not in self._expecting:
-            raise UnicityError("'{:s}' not an expected client file".format(fl))
-        if obj is not None:
-            funcname = obj + '.' + func
-        else:
-            funcname = func
+        fl, obj, func = self._split_at_delimiter(routine)
+        fl1, obj1, func1 = self._split_at_delimiter(prior_routine, prior_project)
+        
+        # get routine name
+        funcname =  obj + '.' + func if obj is not None else func
+        funcname1 =  obj1 + '.' + func1 if obj1 is not None else func1
 
-        # check for misspellings
-        if funcname is not None:
-            presence = 0.
-            for cl in self.clientlist:
-                try:
-                    cl.portfolio.files[fl].functions[funcname]
-                    presence += 1
-                except:
-                    pass
-            presence = presence/len(self.clientlist)
-            if presence < 0.1:
-                raise UnicityError("'{:s}' does not appear frequently in '{}'".format(funcname,fl))
-        
-        
-        for cl in self.clientlist + prior_clientlist:
+        for cl in self.clientlist:
             try:
                 cl.portfolio.files[fl]
             except KeyError:
@@ -945,14 +1021,25 @@ class Project(object):
             # dissociate zipfile for parallel computation
             cl.portfolio.files[fl]._projzip = None
 
+        for cl in prior_clientlist:
+            try:
+                cl.portfolio.files[fl1]
+            except KeyError:
+                # missing file, add a missing tree as a placeholder
+                cl.portfolio.files.update({fl1:FunctionInfo(tree=-1)})
+
+            # dissociate zipfile for parallel computation
+            cl.portfolio.files[fl1]._projzip = None
+
         # jobs to run
         allclientlist = self.clientlist + prior_clientlist
-        fls1 = [allclientlist[i].portfolio.files[fl] for i,j in pairs]
-        fls2 = [allclientlist[j].portfolio.files[fl] for i,j in pairs]
+        fls1 = [allclientlist[i].portfolio.files[fl] if i<n1 else allclientlist[i].portfolio.files[fl1] for i,j in pairs]
+        fls2 = [allclientlist[j].portfolio.files[fl] if j<n1 else allclientlist[j].portfolio.files[fl1] for i,j in pairs]
+        funcs1 = [funcname if i<n1 else funcname1 for i,j in pairs]
+        funcs2 = [funcname if j<n1 else funcname1 for i,j in pairs]
         
-        funcs = [funcname]*len(fls1)
         fls0 = [template]*len(fls1)
-        pars = zip(fls1,fls2,funcs,fls0)
+        pars = zip(fls1,fls2,funcs1,funcs2,fls0)
 
         # run comparisons
             # choose mapping function: serial vs. parallel
@@ -966,9 +1053,9 @@ class Project(object):
         if callable(metric):
             compare_routine = metric
         else:
-            compare_routine = builtin_compare_routines[metric]
+            compare_routine = _builtin_compare_routines[metric]
 
-        outs = mapper(partial(compare, compare_routine=compare_routine), pars)
+        outs = mapper(partial(_compare, compare_routine=compare_routine), pars)
 
         # unpack results
         notfile = True
@@ -979,8 +1066,8 @@ class Project(object):
                 if notfile:
                     fp = open('unicity_compare_errors.txt','w')
                     notfile = False
-                nm1 = self.clientlist[i].name
-                nm2 = self.clientlist[j].name
+                nm1 = allclientlist[i].name
+                nm2 = allclientlist[j].name
                 fp.write('error comparing {:s} to {:s} using {:s}'.format(nm1,nm2,c.metric))
                 fp.write(out)
                 out = 4
@@ -994,40 +1081,44 @@ class Project(object):
             except AttributeError:
                 pass
 
-        c.prior_clientlist = prior_clientlist
+        c._prior_clientlist = prior_clientlist
         return c
     # testing methods\
-    def test(self, routine, ncpus = 1, language='python', client=None, timeout = None, **kwargs):
+    def test(self, routine, ncpus = 1, language='python', client=None, timeout = None, 
+        **kwargs):
         ''' Runs test suite for function name.
 
             Parameters:
             -----------
             routine : str
-                Callable sequence in unicity format for comparison at three levels: {file}, 
-                {file}/{function} or {file}/{class}.{method}.
-            ncpus : int
-                Number of CPUs to use when running comparisons.
-            client : str
-                Run test for individual client, writing their code out to file.
-            timeout : float
-                Only use timeout if you think there is the possiblity of infinite loops.
-                Using a timeout will impact performance. Timeout only implemented for serial.
+                Name of unit test function (not a function handle).
+            ncpus : int (optional)
+                Number of CPUs to use when running comparisons. (default 1, single thread)
+            client : str (optional)
+                Run test for individual client, writing their code out to file. (default is to run
+                test for all clients.)
+            timeout : float (optional)
+                Time after which test should be exited. Only use timeout if you think there 
+                is the possiblity of infinite loops. Using a timeout will impact performance. 
+                Timeout only implemented for serial. (default is no timeout)
             language : python
                 Type of test to run. Base class supports 'python' only. Additional tests can
-                be added by subclassing and defining method _test_{language}.
+                be added by subclassing and defining new method _test_{language}.
+            **kwargs 
+                Passed to language specific method _test_{language}
 
             Notes
             -----
-            Comparisons work by running unit test functions defined inside of test_suite.py.
+            Testing proceeds by running a unit test function defined within the script from
+            which the test method is called.
+
+            The unit test should contain at least one import statement to the generically
+            named client file (the file name passed to 'expecting' when constructing the Project.)
             
-            Unit tests for functions should be named test_{function} and for methods
-            test_{class}_{method} and must be lower case.
+            The unit test should raise an error if the client's code is in error. For instance
+            an assert statement can be used to check a result is returned correctly.
 
-            Unit test should return True if the function passes.
-
-            Subclassed method _test_{language} must take inputs: routine, ncpus, client, timeout and
-            **kwargs. Inspect structure of Project._test_python for more details on implementation 
-            requirements.
+            See examples/batch_testing.py for more details and examples.
         '''
         # check if test_suite.py exists
         wd = os.getcwd()
@@ -1518,6 +1609,7 @@ class PythonFile(BaseFile):
             while True:
                 # add next recursive level
                 for uclass in func.user_classes:
+                    if uclass not in self.classes.keys(): continue
                     for mthd in self.classes[uclass].methods:
                         for ufunc in self.functions[uclass+'.'+mthd].funcs+self.functions[uclass+'.'+mthd].names:
                             if ufunc in clsks and ufunc not in func.user_classes:
@@ -1548,35 +1640,19 @@ class PythonFile(BaseFile):
         return call_dict
 
 # Exceptions
-class ComparisonError(Exception):
-    pass
 class UnicityError(Exception):
     pass
 
-def gev(x,*pars): 
+def _gev(x,*pars): 
     c,scale = pars
     return c/scale*(x/scale)**(c-1)*np.exp(-(x/scale)**c)
-def check_fuzzy_ratio(fl, expect):
+def _check_fuzzy_ratio(fl, expect):
     fl, flext = os.path.splitext(fl)
     expect, expect_ext = os.path.splitext(expect)
     if flext.lower() != expect_ext.lower():
         return 0
     else:
         return fuzz.partial_ratio(expect.lower(), fl.lower())
-def split_at_delimiter(function):
-    if function is None:
-        return None, None, None
-    if '/' not in function:
-        fl = function
-        obj = None
-        func = None                    
-    else:
-        fl, func = function.split('/')
-        if '.' not in func:
-            obj = None
-        else:
-            obj, func = func.split('.')
-    return fl, obj, func        
 def _run_tests(ncpus, pars, timeout):
     ''' Logic for queueing and running tests.
     '''
@@ -1663,7 +1739,7 @@ def _save_test(fl, err, lns):
     for ln in lns: 
         fp.write(ln.rstrip()+'\n')
     fp.close()
-def File(filename, zipfile=None):
+def _File(filename, zipfile=None):
     ''' Assess file type and return corresponding object.
     '''
     ext = filename.lower().split('.')[-1]
@@ -1685,7 +1761,7 @@ def File(filename, zipfile=None):
         return TxtFile(filename, zipfile=zipfile)
     else:
         raise ValueError('unsupported file extension {:s}'.format(ext))
-def compare_command_freq(file1, file2, template, name):
+def _compare_command_freq(file1, file2, template, name1, name2):
     ''' Compute similarity of two Python callable sets.
 
         Parameters:
@@ -1696,8 +1772,10 @@ def compare_command_freq(file1, file2, template, name):
             Python File object for client 2.
         template : File
             Python File object for template file.
-        name : str
-            Routine name for comparison. If none, comparison operates on entire file.
+        name1 : str
+            Routine name for comparison (file1). If none, comparison operates on entire file.
+        name2 : str
+            Routine name for comparison (file2). If none, comparison operates on entire file.
 
         Returns:
         --------
@@ -1707,11 +1785,11 @@ def compare_command_freq(file1, file2, template, name):
 
     '''
     # create callable sets
-    dict1 = file1.get_calls(name)
-    dict2 = file2.get_calls(name)
+    dict1 = file1.get_calls(name1)
+    dict2 = file2.get_calls(name2)
     # if template available, remove callables in template from sources
     if template is not None:
-        dict3 = template.get_calls(name)
+        dict3 = template.get_calls(name1)
         for k in dict3.keys():
             for dict in [dict1, dict2]:
                 if k in dict.keys():
@@ -1733,7 +1811,7 @@ def compare_command_freq(file1, file2, template, name):
         dissimilar = 1.
 
     return 1.-similar/(similar+dissimilar)
-def jaro(s, t):
+def _jaro(s, t):
     '''Jaro distance between two strings.
     
         Implementation from https://rosettacode.org/wiki/Jaro_distance#Python
@@ -1782,7 +1860,7 @@ def jaro(s, t):
     return ((matches / s_len) +
             (matches / t_len) +
             ((matches - transpositions / 2) / matches)) / 3
-def compare_jaro(file1, file2, template, name):
+def _compare_jaro(file1, file2, template, name1, name2):
     ''' Compute similarity of two Python callable sets based on Jaro distance.
 
         Parameters:
@@ -1793,8 +1871,10 @@ def compare_jaro(file1, file2, template, name):
             Python File object for client 2.
         template : File
             Python File object for template file.
-        name : str
-            Routine name for comparison. If none, comparison operates on entire file.
+        name1 : str
+            Routine name for comparison (file1). If none, comparison operates on entire file.
+        name2 : str
+            Routine name for comparison (file2). If none, comparison operates on entire file.
 
         Returns:
         --------
@@ -1803,16 +1883,16 @@ def compare_jaro(file1, file2, template, name):
             1 = highly dissimilar).
     '''
     # convert ordered callable set to string
-    if name is None:
+    if name1 is None:
         all_keywords1 = file1.all_keywords
         all_keywords2 = file2.all_keywords
         if template is not None:
             all_keywords0 = template.all_keywords
     else:
-        all_keywords1 = file1.functions[name].all_keywords
-        all_keywords2 = file2.functions[name].all_keywords
+        all_keywords1 = file1.functions[name1].all_keywords
+        all_keywords2 = file2.functions[name2].all_keywords
         if template is not None:
-            all_keywords0 = template.functions[name].all_keywords
+            all_keywords0 = template.functions[name1].all_keywords
         
     # remove template content if given
     if template is not None:
@@ -1827,7 +1907,7 @@ def compare_jaro(file1, file2, template, name):
                 pass
 
     # compute similarity
-    similar = jaro(all_keywords1, all_keywords2)
+    similar = _jaro(all_keywords1, all_keywords2)
     
     return 1.-similar
 def _get_client_code(client, import_froms):
@@ -1860,7 +1940,7 @@ def _get_client_code(client, import_froms):
         return -1
     else:
         return ilns+clns
-def compare(file1, file2, name, template, compare_routine):
+def _compare(file1, file2, name1, name2, template, compare_routine):
     ''' Compute similarity of two Python functions.
     '''
 
@@ -1869,13 +1949,13 @@ def compare(file1, file2, name, template, compare_routine):
     if file1.tree == -1 or file2.tree == -1:
         return 2
         # 3 for no file to compare
-    if name is not None:
-        if name not in file1.functions or name not in file2.functions:
+    if name1 is not None:
+        if name1 not in file1.functions or name2 not in file2.functions:
             return 3
     
     # compute pycode_similar score (similarity of ast tree)
     try:
-        similarity = compare_routine(file1, file2, template, name)
+        similarity = compare_routine(file1, file2, template, name1, name2)
     except:
         # return flag 4 for unspecified compare errors (set later)
         err = str(traceback.format_exc())+'\n'
@@ -1883,12 +1963,5 @@ def compare(file1, file2, name, template, compare_routine):
         return err
 
     return similarity
-def isiterable(x):
-    ''' Returns true if input is iterable.
-    '''
-    try:
-        _ = (xi for xi in x)
-        return True
-    except TypeError:
-        return False
-builtin_compare_routines = {'command_freq':compare_command_freq,'jaro':compare_jaro}
+
+_builtin_compare_routines = {'command_freq':_compare_command_freq,'jaro':_compare_jaro}

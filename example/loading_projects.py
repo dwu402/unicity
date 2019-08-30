@@ -1,6 +1,6 @@
 
 import sys
-sys.path.append(r'D:\code\unicity')
+sys.path.append(r'E:\code\unicity')
 from unicity.unicity import Project 
 
 def load_project():
@@ -22,7 +22,7 @@ def load_project_with_cohort_file():
 
 def load_project_from_folder():
     # projects can be loaded from folders the same as zip files   
-    # (extract example_project.zip) before running this command
+    # (extract example_project.zip before running this command)
     proj = Project('example_project', expecting=['functions.py', 'tasks.py'])
     
     proj.summarise('example_project.log')
@@ -30,7 +30,7 @@ def load_project_from_folder():
 if __name__ == "__main__":
     load_project()
 
-    #load_project_with_cohort_file()
+    load_project_with_cohort_file()
 
     #load_project_from_folder()
     
