@@ -1,7 +1,4 @@
-
-import sys
-sys.path.append(r'D:\code\unicity')
-from unicity.unicity import Project 
+from unicity import Project 
 
 def load_project():
     # load a Project from a zip file, tell unicity to look for

@@ -1,6 +1,4 @@
-import sys
-sys.path.append(r'E:\code\unicity')
-from unicity.unicity import Project 
+from unicity import Project 
 
 def test_function():
     # This function serves as a unit test for client code. It should raise

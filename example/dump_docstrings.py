@@ -1,7 +1,4 @@
-
-import sys
-sys.path.append(r'E:\code\unicity')
-from unicity.unicity import Project, Comparison 
+from unicity import Project 
 
 def dump_docstrings():
     # load a Project

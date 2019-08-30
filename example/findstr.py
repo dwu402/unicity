@@ -1,7 +1,4 @@
-
-import sys
-sys.path.append(r'E:\code\unicity')
-from unicity.unicity import Project 
+from unicity import Project 
 
 def find_string():
     # load a Project
