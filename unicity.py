@@ -1,4 +1,4 @@
-import os, ast, zipfile, sys, traceback, re, glob, inspect
+import os, ast, zipfile, sys, traceback, re, glob, inspect, warnings
 import numpy as np
 from itertools import starmap
 from functools import partial
@@ -10,12 +10,16 @@ import scipy.cluster.hierarchy as sch
 from scipy.optimize import curve_fit
 from scipy.stats import genextreme
 from scipy.spatial.distance import squareform
-from fuzzywuzzy import fuzz
 from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
 Image.MAX_IMAGE_PIXELS = 1000000000
 
+# silent warning on fuzzywuzzy import
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from fuzzywuzzy import fuzz
+	
 # General classes
 class _Cohort(object):
     ''' Class for all clients in a cohort.
