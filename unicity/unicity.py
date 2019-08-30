@@ -17,37 +17,13 @@ from difflib import SequenceMatcher
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # General classes
-class Portfolio(object):
-    ''' Class for individual client file collection.
-    '''
-    def __init__(self):
-        self.files = {}
-        self.late = False
-        self.missing = []
-class Cohort(object):
+class _Cohort(object):
     ''' Class for all clients in a cohort.
 
         Parameters:
         -----------
         filename : str
             Path to file containing cohort information. 
-
-        Notes:
-        ------
-        Cohort file should contain client information in CSV format. The first row
-        defines column names and must at least contain a 'name' column. Client information
-        is given on separate rows.
-        
-        For example, the contents of 'cohort.txt'
-
-        name, firstname, surname, email
-        johnsonjunko, junko, johnson, j.johnson@unicity.co.nz
-        trosttrisha, trisha, trost, t.trost@unicity.co.nz
-        romoricki, ricki, romo, r.romo@unicity.co.nz
-        mccardellmirta, mirta,mccardell, m.mccardell@unicity.co.nz
-
-        Each column is provisioned as a separate attribute of the Cohort object. If the
-        'email' attribute is present, this will be reported in output.
     '''
     def __init__(self, filename):
         self.filename = filename
@@ -98,6 +74,16 @@ class Cohort(object):
 class Client(object):
     ''' Class for individual client.
 
+        Attributes:
+        -----------
+        name : str
+            Name associated with client.
+        files : dict
+            Dictionary of File objects, keyed by file name, associated with the 
+            client's portfolio.
+        missing : list
+            Expected files missing from the client's portfolio.
+
         Notes:
         ------
         When created by a Project object with an associated cohort file, Client
@@ -114,12 +100,12 @@ class Client(object):
                     continue
                 self.__setattr__(col, cohort.__getattribute__(col)[i])
         # setup other attributes
-        self.cs_score = 0
-        self.portfolio = Portfolio()
+        self.files = {}
+        self.missing = []
     def __repr__(self):
         return 'cl:'+self.name
     @property
-    def name_email(self):
+    def _name_email(self):
         try:
             return '{:s} ({:s})'.format(self.name, self.email)
         except AttributeError:
@@ -368,7 +354,7 @@ class Project(object):
         ignore : list (optional)
             List of file names to ignore (unix identifiers fine).
         cohort : str (optional)
-            Path to file containing information about clients. See Cohort object.
+            Path to file containing information about clients.
         root : str (optional)
             String for naming of output files.
         
@@ -378,8 +364,6 @@ class Project(object):
             Dictionary of Client objects, keyed by client name.
         clientlist : list
             List of Client objects, ordered alphabetically by client name.
-        cohort : Cohort
-            Object containing cohort information.
         portfolio_status : dict
             Contains completeness information about individual client portfolios.
         test_status : dict
@@ -399,6 +383,23 @@ class Project(object):
             Output a summary of the project.
         test
             Batch testing of the code.
+
+        Notes:
+        ------
+        Cohort file should contain client information in CSV format. The first row
+        defines column names and must at least contain a 'name' column. Client information
+        is given on separate rows.
+        
+        For example, the contents of 'cohort.txt'
+
+        name, firstname, surname, email
+        johnsonjunko, junko, johnson, j.johnson@unicity.co.nz
+        trosttrisha, trisha, trost, t.trost@unicity.co.nz
+        romoricki, ricki, romo, r.romo@unicity.co.nz
+        mccardellmirta, mirta,mccardell, m.mccardell@unicity.co.nz
+
+        Each column is provisioned as a separate attribute for each client as discovered. If the
+        'email' attribute is present, this will be reported in output.
     '''
     def __init__(self, project, expecting, ignore = ['*'], cohort = None, root = None):
         
@@ -414,9 +415,9 @@ class Project(object):
         
         self._root = root
         if cohort is not None:
-            self.cohort = Cohort(cohort)
+            self._cohort = Cohort(cohort)
         else:
-            self.cohort = None
+            self._cohort = None
         self._parse_filepath()
         self._expecting = expecting
         self._ignore_files = ignore
@@ -485,7 +486,6 @@ class Project(object):
             fls = [fl.filename for fl in zf.filelist]
         for fl in fls:
             client = self._parse(fl)       # get corresponding client
-            client.late = self._check_late(fl)
 
             # fuzzy string matching because people can't follow instructions
             ratios = [_check_fuzzy_ratio(fl, expect) for expect in self._expecting]
@@ -498,7 +498,7 @@ class Project(object):
                 self._ignore(fl)
                 continue 
 
-            client.portfolio.files.update({fl0:_File(fl, zf)})            # save file information
+            client.files.update({fl0:_File(fl, zf)})            # save file information
         
         # sort clients alphabetically 
         self.clientlist = sorted(self.clientlist, key = lambda x: x.name)
@@ -513,13 +513,13 @@ class Project(object):
             return self.client[name]
         except KeyError:
             
-            if self.cohort is not None:
-                if name not in self.cohort.name:
+            if self._cohort is not None:
+                if name not in self._cohort.name:
                     raise ValueError("client '{}' from file '{}' not in cohort file '{}'".format(
-                        name, fl, self.cohort.filename 
+                        name, fl, self._cohort.filename 
                     ))
 
-            cl = Client(name, self.cohort)
+            cl = Client(name, self._cohort)
             self.clientlist.append(cl)
             self.client.update({cl.name:cl})
             return cl
@@ -549,32 +549,13 @@ class Project(object):
         fl = fl.split('_')[1]
 
         return fl + '.' + ext
-    def _check_late(self, fl):
-        ''' Check if file name indicates late portfolio.
-
-            Parameters:
-            -----------
-            fl : str
-                file name with decorators
-
-            Returns:
-            --------
-            bool
-                True flag indicates file was submitted late
-
-            Notes:
-            ------
-            Overload this method for custom application. Default implementation
-            assumes no files are late.
-        '''
-        return False
     def _check_portfolio_status(self):
         ''' Compile portfolio completeness information.
         '''
         # clients with absent portfolios (if cohort info available)
-        if self.cohort is not None:
+        if self._cohort is not None:
             submitted = self.client.keys()
-            self.portfolio_status['absent'] = [Client(name, self.cohort) for name in self.cohort.name if name not in submitted]
+            self.portfolio_status['absent'] = [Client(name, self._cohort) for name in self._cohort.name if name not in submitted]
         
         # clients with partial portfolios (if expecting defined)
         if self._expecting is None:
@@ -582,8 +563,8 @@ class Project(object):
 
         for cl in self.clientlist:
             # partial portfolios (missing files)
-            cl.portfolio.missing = list(set(self._expecting) - set(cl.portfolio.files.keys()))
-            if len(cl.portfolio.missing) > 0:
+            cl.missing = list(set(self._expecting) - set(cl.files.keys()))
+            if len(cl.missing) > 0:
                 self.portfolio_status['partial'].append(cl)
             # complete portfolios (no missing files)
             else:
@@ -638,7 +619,7 @@ class Project(object):
             presence = 0.
             for cl in self.clientlist:
                 try:
-                    cl.portfolio.files[fl].functions[funcname]
+                    cl.files[fl].functions[funcname]
                     presence += 1
                 except:
                     pass
@@ -679,7 +660,7 @@ class Project(object):
         for cl in self.clientlist:
             written_name = False
             # extract lines filtered by file or routine
-            for fln,fli in cl.portfolio.files.items():
+            for fln,fli in cl.files.items():
                 written_file = False
                 # logic to narrow search field
                 if fl is None:
@@ -693,7 +674,7 @@ class Project(object):
                     # case 3 - search in specific file, search entire file
                     lns = fli.lns
                     ilns = np.arange(1, len(lns)+1)
-                elif fli.tree == -1:
+                elif fli._tree == -1:
                     # case 4 - search in specific routine, syntax compile errors
                     continue
                 elif func not in fli.functions:
@@ -759,14 +740,14 @@ class Project(object):
         fp.write(fline)
         fp.write("SUMMARY\n")
         fp.write(fline)
-        if self.cohort is not None:
-            fp.write("{:s}: {:d} clients\n".format(self.cohort.filename, len(self.cohort.name)))
+        if self._cohort is not None:
+            fp.write("{:s}: {:d} clients\n".format(self._cohort.filename, len(self._cohort.name)))
         else:
             fp.write("cohort: {:d} clients\n".format(len(self.clientlist)))
         fp.write('-----\n')
         fp.write('{:d} clients with complete portfolios\n'.format(len(self.portfolio_status['complete'])))
         fp.write('{:d} clients with partial portfolios\n'.format(len(self.portfolio_status['partial'])))
-        if self.cohort is not None:
+        if self._cohort is not None:
             fp.write('{:d} clients with absent portfolio\n'.format(len(self.portfolio_status['absent'])))
         
         if self._run_test:
@@ -784,8 +765,8 @@ class Project(object):
             fp.write("PARTIAL PORTFOLIOS\n")
             fp.write(fline)
             for cl in self.portfolio_status['partial']:
-                fp.write('{:s}, missing '.format(cl.name_email))
-                fp.write((len(cl.portfolio.missing)*'{:s}, ').format(*(cl.portfolio.missing))[:-2]+'\n')
+                fp.write('{:s}, missing '.format(cl._name_email))
+                fp.write((len(cl.missing)*'{:s}, ').format(*(cl.missing))[:-2]+'\n')
             fp.write('\n')
 
         # more information about absent portfolios
@@ -794,7 +775,7 @@ class Project(object):
             fp.write("ABSENT PORTFOLIOS\n")
             fp.write(fline)
             for cl in self.portfolio_status['absent']:
-                fp.write('{:s}\n'.format(cl.name_email))
+                fp.write('{:s}\n'.format(cl._name_email))
             fp.write('\n')
 
         # more information about failed tests, syntax errors, absent tests
@@ -809,7 +790,7 @@ class Project(object):
                 fp.write("{:s}\n".format(msg))
                 fp.write(fline)
                 for cl in self.test_status[key]:
-                    fp.write('{:s}\n'.format(cl.name_email))
+                    fp.write('{:s}\n'.format(cl._name_email))
                 fp.write('\n')
         fp.close()
 
@@ -834,15 +815,15 @@ class Project(object):
         fl,obj,func = self._split_at_delimiter(routine)
         fp = open(save,'w')
         for cl in self.clientlist:
-            fp.write('# {:s}\n'.format(cl.name_email))
+            fp.write('# {:s}\n'.format(cl._name_email))
             fp.write('if True:\n')
-            if fl not in cl.portfolio.files.keys():
+            if fl not in cl.files.keys():
                 continue
             try:
                 if obj is None:
-                    ds = cl.portfolio.files[fl].functions[func].docstring
+                    ds = cl.files[fl].functions[func].docstring
                 else:
-                    ds = cl.portfolio.files[fl].classes[obj].methods[func].docstring
+                    ds = cl.files[fl].classes[obj].methods[func].docstring
             except KeyError:
                 ds = None
             except AttributeError:
@@ -1013,28 +994,28 @@ class Project(object):
 
         for cl in self.clientlist:
             try:
-                cl.portfolio.files[fl]
+                cl.files[fl]
             except KeyError:
                 # missing file, add a missing tree as a placeholder
-                cl.portfolio.files.update({fl:FunctionInfo(tree=-1)})
+                cl.files.update({fl:FunctionInfo(tree=-1)})
 
             # dissociate zipfile for parallel computation
-            cl.portfolio.files[fl]._projzip = None
+            cl.files[fl]._projzip = None
 
         for cl in prior_clientlist:
             try:
-                cl.portfolio.files[fl1]
+                cl.files[fl1]
             except KeyError:
                 # missing file, add a missing tree as a placeholder
-                cl.portfolio.files.update({fl1:FunctionInfo(tree=-1)})
+                cl.files.update({fl1:FunctionInfo(tree=-1)})
 
             # dissociate zipfile for parallel computation
-            cl.portfolio.files[fl1]._projzip = None
+            cl.files[fl1]._projzip = None
 
         # jobs to run
         allclientlist = self.clientlist + prior_clientlist
-        fls1 = [allclientlist[i].portfolio.files[fl] if i<n1 else allclientlist[i].portfolio.files[fl1] for i,j in pairs]
-        fls2 = [allclientlist[j].portfolio.files[fl] if j<n1 else allclientlist[j].portfolio.files[fl1] for i,j in pairs]
+        fls1 = [allclientlist[i].files[fl] if i<n1 else allclientlist[i].files[fl1] for i,j in pairs]
+        fls2 = [allclientlist[j].files[fl] if j<n1 else allclientlist[j].files[fl1] for i,j in pairs]
         funcs1 = [funcname if i<n1 else funcname1 for i,j in pairs]
         funcs2 = [funcname if j<n1 else funcname1 for i,j in pairs]
         
@@ -1077,7 +1058,7 @@ class Project(object):
         # restore zipfile buffers
         for cl in self.clientlist:
             try:
-                cl.portfolio.files[fl]._projzip = zipfile.ZipFile(cl.portfolio.files[fl]._projzip)
+                cl.files[fl]._projzip = zipfile.ZipFile(cl.files[fl]._projzip)
             except AttributeError:
                 pass
 
@@ -1251,7 +1232,7 @@ class Project(object):
             # write fail file
             fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
             _save_test(fl, err, lns)
-class FunctionVisitor(ast.NodeVisitor):
+class _FunctionVisitor(ast.NodeVisitor):
     ''' Class to gather data on Python file.
     '''
     def __init__(self):
@@ -1427,28 +1408,72 @@ class FunctionVisitor(ast.NodeVisitor):
             pass
         ast.NodeVisitor.generic_visit(self, node)
 class FunctionInfo(object):
-    ''' Class to collect function metadata.
+    ''' Class containing information about Python callable.
+
+        Attributes:
+        -----------
+        all_keywords
+
+        docstring : str
+
+        funcs
+
+        import_froms
+
+        lineno
+
+        lns
+
+        methods
+
+        name
+
+        names
+
+        user_classes
+
+        user_funcs
+
+        
+
     '''
     def __init__(self, **kwargs):
         for k in kwargs.keys():
             self.__setattr__(k, kwargs[k])
-        self.depends_class = None
-        self.depends_func = None
     def __repr__(self):
         try:
             return self.name
         except AttributeError:
             return 'FunctionInfoObj'
 class ClassInfo(object):
-    ''' Class to collect class metadata.
+    ''' Class containing information about Python class.
+
+        Attributes:
+        -----------
+        all_keywords
+
+        base
+
+        defs
+
+        docstring
+
+        lineno
+
+        ln
+
+        methods
+
+        name
+
+        
+
     '''
     def __init__(self, **kwargs):
         self.defs = []
         self.methods = {}
         for k in kwargs.keys():
             self.__setattr__(k, kwargs[k])
-        self.depends_class = None
-        self.depends_func = None
     def __repr__(self):
         try:
             return self.name
@@ -1511,25 +1536,45 @@ class CFile(BaseFile):
     def __init__(self, filename, zipfile):
         super(CFile,self).__init__(filename, zipfile)
 class PythonFile(BaseFile):
-    ''' Class to gather data on Python file.
+    ''' Class containing information about Python file.
+
+        Attributes:
+        -----------
+        all_calls : list
+            All callables in file, in order of appearance.
+        all_keywords : list
+            All callables and reserved keywords in file, in order of appearance.
+        classes : dict
+            ClassInfo objects corresponding to classes defined in file.
+        filename : str
+            Name of file.
+        functions : dict
+            FunctionInfo objects corresponding to callables defined in file.
+        import_froms : list
+            List of [module, thing] import from statements in from {module} import {thing} format.
+        import_lines : list
+            Line numbers of import statements.
+        lns : list
+            Text of file.
+        reserved : dict
+            Frequency of reserved keywords.
     '''
     def __init__(self, filename, zipfile):
         super(PythonFile,self).__init__(filename, zipfile)
-        self.tree = None
-        self.calls = []
-        self.parse_file()
-    def parse_file(self):
+        self._tree = None
+        self._parse_file()
+    def _parse_file(self):
         ''' Parse Python file for function definition info.
         '''
         # load the ast tree
         try:
-            self.tree = ast.parse(''.join(self.lns))
+            self._tree = ast.parse(''.join(self.lns))
         except SyntaxError:
-            self.tree = -1
+            self._tree = -1
             return
         # visit nodes in the tree
-        fv = FunctionVisitor()
-        fv.visit(self.tree)
+        fv = _FunctionVisitor()
+        fv.visit(self._tree)
         # save info from tree visit
             # class info
         self.classes = fv.classes
@@ -1551,9 +1596,9 @@ class PythonFile(BaseFile):
         self.all_keywords = fv.all_keywords
         self.reserved = fv.reserved
         # post-processing 
-        self.get_user_funcs()
-        self.get_user_classes()
-    def get_user_funcs(self):
+        self._get_user_funcs()
+        self._get_user_classes()
+    def _get_user_funcs(self):
         ''' Identify which user defined functions are called from the same file.
 
             Recurses to identify all dependent functions
@@ -1583,7 +1628,7 @@ class PythonFile(BaseFile):
                 recurseCount +=1
                 if recurseCount == 100:
                     raise ValueError('uh oh, infinite loop...')
-    def get_user_classes(self):
+    def _get_user_classes(self):
         ''' Identify which user defined classes are called from the same file.
 
             Recurses to identify all dependent classes
@@ -1625,7 +1670,7 @@ class PythonFile(BaseFile):
                 recurseCount +=1
                 if recurseCount == 100:
                     raise ValueError('uh oh, infinite loop...')
-    def get_calls(self, name):
+    def _get_calls(self, name):
         ''' Return dictionary of callables and their frequency.
         '''
         if name is None:
@@ -1785,11 +1830,11 @@ def _compare_command_freq(file1, file2, template, name1, name2):
 
     '''
     # create callable sets
-    dict1 = file1.get_calls(name1)
-    dict2 = file2.get_calls(name2)
+    dict1 = file1._get_calls(name1)
+    dict2 = file2._get_calls(name2)
     # if template available, remove callables in template from sources
     if template is not None:
-        dict3 = template.get_calls(name1)
+        dict3 = template._get_calls(name1)
         for k in dict3.keys():
             for dict in [dict1, dict2]:
                 if k in dict.keys():
@@ -1920,7 +1965,7 @@ def _get_client_code(client, import_froms):
     for import_from in import_froms:
         fl,item = import_from
         # import not client code, write out verbatim
-        if fl+'.py' not in client.portfolio.files.keys():
+        if fl+'.py' not in client.files.keys():
             ilns.append('from {:s} import {:s}'.format(fl, item))
             continue
 
@@ -1930,8 +1975,8 @@ def _get_client_code(client, import_froms):
             included_files.append(fl+'.py')
 
         # import is a custom, gather client code
-        fnfli = client.portfolio.files[fl+'.py']
-        if fnfli.tree == -1:
+        fnfli = client.files[fl+'.py']
+        if fnfli._tree == -1:
             return -3
         clns += fnfli.lns
         
@@ -1946,7 +1991,7 @@ def _compare(file1, file2, name1, name2, template, compare_routine):
 
     # return flags
         # 2 for syntax errors
-    if file1.tree == -1 or file2.tree == -1:
+    if file1._tree == -1 or file2._tree == -1:
         return 2
         # 3 for no file to compare
     if name1 is not None:

@@ -30,7 +30,7 @@ def load_project_from_folder():
 if __name__ == "__main__":
     load_project()
 
-    load_project_with_cohort_file()
+    #load_project_with_cohort_file()
 
     #load_project_from_folder()
     
