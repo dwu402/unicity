@@ -1412,30 +1412,30 @@ class FunctionInfo(object):
 
         Attributes:
         -----------
-        all_keywords
-
+        all_keywords : list
+            All callables and reserved keywords in file, in order of appearance.
         docstring : str
-
-        funcs
-
-        import_froms
-
-        lineno
-
-        lns
-
-        methods
-
-        name
-
-        names
-
-        user_classes
-
-        user_funcs
-
+            Docstring for the function.
+        funcs : list
+            Names of functions called within this function.
+        import_froms : list
+            List of [module, thing] import from statements in from {module} import {thing} format.
+        lineno : list
+            First and last line number of function in file.
+        lns : list
+            Text of function.
+        methods : list
+            Names of methods called within the function.
+        name : str
+            Name of the funtion.
+        names : list
+            A python ast category I don't fully understand but useful for catching when
+            the client invokes an Exception.
+        user_classes : list
+            Names of classes defined by the client and used within this function.
+        user_funcs : list
+            Names of functions defined by the client and used within this funcion.
         
-
     '''
     def __init__(self, **kwargs):
         for k in kwargs.keys():
@@ -1450,24 +1450,22 @@ class ClassInfo(object):
 
         Attributes:
         -----------
-        all_keywords
-
-        base
-
-        defs
-
-        docstring
-
-        lineno
-
-        ln
-
-        methods
-
-        name
-
-        
-
+        all_keywords : list
+            All callables and reserved keywords in file, in order of appearance.
+        base : str
+            Base class.
+        defs : list
+            Names of methods defined within the class.
+        docstring : string
+            Docstring for the class.
+        lineno: list
+            First and last line number of class definition in file.
+        lns : list
+            Text of class.
+        methods : list
+            Names of methods called within the class.
+        name : str
+            Name of the class.
     '''
     def __init__(self, **kwargs):
         self.defs = []
