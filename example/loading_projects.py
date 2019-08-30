@@ -1,6 +1,6 @@
 
 import sys
-sys.path.append(r'E:\code\unicity')
+sys.path.append(r'D:\code\unicity')
 from unicity.unicity import Project 
 
 def load_project():
