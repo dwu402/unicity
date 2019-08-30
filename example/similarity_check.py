@@ -1,7 +1,4 @@
-
-import sys
-sys.path.append(r'E:\code\unicity')
-from unicity.unicity import Project, Comparison 
+from unicity import Project, Comparison 
 
 def similarity_check():
     # load a Project
