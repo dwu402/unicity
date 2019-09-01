@@ -18,11 +18,11 @@ def similarity_check_with_template():
 
 def similarity_check_prior_project():
     # load a Project
-    proj = Project('example_project.zip', expecting=['functions.py'])
+    proj = Project('example_project_anon', expecting=['functions.py'])
     # load a previous Project
-    prior_proj = Project('prior_project.zip', expecting=['functions.py'])
+    prior_proj = Project('prior_project_anon', expecting=['functions.py'])
     # run similarity check on whole file, using template file and 2 cpus
-    comp = proj.compare('functions.py/NetworkNZ.read_network', prior_project=prior_proj)
+    comp = proj.compare('functions.py/Roads.read', prior_project=prior_proj)
     # plot anonymised similarity check
     proj.similarity_report(comp)
     
@@ -48,11 +48,11 @@ def save_and_load_comparisons():
     proj.similarity_report(comp_loaded)
 
 if __name__ == "__main__":
-    similarity_check()
+    #similarity_check()
     
     #similarity_check_with_template()
 
-    #similarity_check_prior_project()
+    similarity_check_prior_project()
     
     #similarity_check_jaro()
 
