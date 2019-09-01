@@ -28,7 +28,7 @@ Each submitter is called a **client**. Each client submits a **portfolio** of Py
 
 A project is a collection of Python files submitted by several different clients. They should be contained in a zip archive or folder. Each file should follow a particular naming convention 
 
-`` {clientname}_*{expected_file}*.{ext} ``
+``{clientname}_*{expected_file}*.{ext}``
 
 where ``{expected_file.ext}`` is passed as an argument to the ``Project`` constructor.
 
@@ -37,6 +37,9 @@ Passing a path to a ``cohort`` file will give the ``Project`` additional data to
 Test parts of the submission using the ``test`` method. This will require you to define a test function, that in turn calls functions or classes from a client's portfolio.
 
 Check similarity metrics across the entire project with the ``compare`` method. You can compare particular methods, exclude similarity deriving from a common template, and compare with past projects.
+
+Projects
+~~~~~~~~
 
 .. autoclass:: unicity.Project
 	:members:
@@ -56,3 +59,10 @@ Check similarity metrics across the entire project with the ``compare`` method. 
 .. autoclass:: unicity.ClassInfo
 	:members:
 
+
+Indices and tables
+==================
+	
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

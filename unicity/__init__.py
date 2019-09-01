@@ -393,18 +393,6 @@ class Project(object):
         Cohort file should contain client information in CSV format. The first row
         defines column names and must at least contain a 'name' column. Client information
         is given on separate rows.
-        
-        For example, the contents of 'cohort.txt'
-
-        name, firstname, surname, email
-		
-        johnsonjunko, junko, johnson, j.johnson@unicity.co.nz
-		
-        trosttrisha, trisha, trost, t.trost@unicity.co.nz
-		
-        romoricki, ricki, romo, r.romo@unicity.co.nz
-		
-        mccardellmirta, mirta,mccardell, m.mccardell@unicity.co.nz
 
         Each column is provisioned as a separate attribute for each client as discovered. If the
         'email' attribute is present, this will be reported in output.
