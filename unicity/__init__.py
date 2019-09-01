@@ -411,7 +411,7 @@ class Project(object):
         
         self._root = root
         if cohort is not None:
-            self._cohort = Cohort(cohort)
+            self._cohort = _Cohort(cohort)
         else:
             self._cohort = None
         self._parse_filepath()
@@ -945,7 +945,7 @@ class Project(object):
         '''
         # check comparison metric available
         if not callable(metric):
-            assert metric in builtin_compare_routines, "Unrecognized metric \'{:s}\'".format(metric)
+            assert metric in _builtin_compare_routines, "Unrecognized metric \'{:s}\'".format(metric)
 
         # check prior routine only specified if prior project given
         assert not (prior_routine is not None and prior_project is None), "must pass prior_project if you're going to pass prior_routine"
@@ -993,7 +993,7 @@ class Project(object):
                 cl.files[fl]
             except KeyError:
                 # missing file, add a missing tree as a placeholder
-                cl.files.update({fl:FunctionInfo(tree=-1)})
+                cl.files.update({fl:FunctionInfo(_tree=-1)})
 
             # dissociate zipfile for parallel computation
             cl.files[fl]._projzip = None
@@ -1003,7 +1003,7 @@ class Project(object):
                 cl.files[fl1]
             except KeyError:
                 # missing file, add a missing tree as a placeholder
-                cl.files.update({fl1:FunctionInfo(tree=-1)})
+                cl.files.update({fl1:FunctionInfo(_tree=-1)})
 
             # dissociate zipfile for parallel computation
             cl.files[fl1]._projzip = None
