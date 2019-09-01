@@ -397,9 +397,13 @@ class Project(object):
         For example, the contents of 'cohort.txt'
 
         name, firstname, surname, email
+		
         johnsonjunko, junko, johnson, j.johnson@unicity.co.nz
+		
         trosttrisha, trisha, trost, t.trost@unicity.co.nz
+		
         romoricki, ricki, romo, r.romo@unicity.co.nz
+		
         mccardellmirta, mirta,mccardell, m.mccardell@unicity.co.nz
 
         Each column is provisioned as a separate attribute for each client as discovered. If the
@@ -949,7 +953,7 @@ class Project(object):
             User metrics that raise exceptions are caught and passed, with the error message written
             to unicity_compare_errors.txt for debugging.
 
-            See examples/similarity_check.py for more details and examples.
+            See example/similarity_check.py at https://https://github.com/ddempsey/unicity for more details and examples.
         '''
         # check comparison metric available
         if not callable(metric):
@@ -1103,7 +1107,7 @@ class Project(object):
             The unit test should raise an error if the client's code is in error. For instance
             an assert statement can be used to check a result is returned correctly.
 
-            See examples/batch_testing.py for more details and examples.
+            See example/batch_testing.py at https://https://github.com/ddempsey/unicity for more details and examples.
         '''
         # check if test_suite.py exists
         wd = os.getcwd()
