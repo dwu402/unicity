@@ -1,0 +1,34 @@
+\begin{sphinxtheindex}
+\def\bigletter#1{{\Large\sffamily#1}\nopagebreak\vspace{1mm}}
+
+  \bigletter C
+  \item ClassInfo (class in unicity), \hyperpage{7}
+  \item Client (class in unicity), \hyperpage{6}
+  \item compare() (unicity.Project method), \hyperpage{4}
+  \item Comparison (class in unicity), \hyperpage{6}
+
+  \indexspace
+  \bigletter D
+  \item dump\_docstrings() (unicity.Project method), \hyperpage{5}
+
+  \indexspace
+  \bigletter F
+  \item findstr() (unicity.Project method), \hyperpage{5}
+  \item FunctionInfo (class in unicity), \hyperpage{6}
+
+  \indexspace
+  \bigletter P
+  \item Project (class in unicity), \hyperpage{3}
+  \item PythonFile (class in unicity), \hyperpage{6}
+
+  \indexspace
+  \bigletter S
+  \item save() (unicity.Comparison method), \hyperpage{6}
+  \item similarity\_report() (unicity.Project method), \hyperpage{5}
+  \item summarise() (unicity.Project method), \hyperpage{5}
+
+  \indexspace
+  \bigletter T
+  \item test() (unicity.Project method), \hyperpage{5}
+
+\end{sphinxtheindex}
