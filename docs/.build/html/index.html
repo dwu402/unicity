@@ -95,7 +95,11 @@
               <div class="local-toc"><ul>
 <li><a class="reference internal" href="#">What is unicity?</a></li>
 <li><a class="reference internal" href="#python-classes">Python classes</a><ul>
-<li><a class="reference internal" href="#projects">Projects</a><ul>
+<li><a class="reference internal" href="#projects">Projects</a></li>
+<li><a class="reference internal" href="#clients">Clients</a></li>
+<li><a class="reference internal" href="#comparisons">Comparisons</a></li>
+<li><a class="reference internal" href="#pythonfiles">PythonFiles</a></li>
+<li><a class="reference internal" href="#functioninfo-and-classinfo">FunctionInfo and ClassInfo</a><ul>
 <li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 </li>
@@ -231,12 +235,6 @@
 <p>Cohort file should contain client information in CSV format. The first row
 defines column names and must at least contain a ‘name’ column. Client information
 is given on separate rows.</p>
-<p>For example, the contents of ‘cohort.txt’</p>
-<p>name, firstname, surname, email
-johnsonjunko, junko, johnson, <a class="reference external" href="mailto:j&#46;johnson&#37;&#52;&#48;unicity&#46;co&#46;nz">j<span>&#46;</span>johnson<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
-trosttrisha, trisha, trost, <a class="reference external" href="mailto:t&#46;trost&#37;&#52;&#48;unicity&#46;co&#46;nz">t<span>&#46;</span>trost<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
-romoricki, ricki, romo, <a class="reference external" href="mailto:r&#46;romo&#37;&#52;&#48;unicity&#46;co&#46;nz">r<span>&#46;</span>romo<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
-mccardellmirta, mirta,mccardell, <a class="reference external" href="mailto:m&#46;mccardell&#37;&#52;&#48;unicity&#46;co&#46;nz">m<span>&#46;</span>mccardell<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a></p>
 <p>Each column is provisioned as a separate attribute for each client as discovered. If the
 ‘email’ attribute is present, this will be reported in output.</p>
 <dl class="method">
@@ -304,7 +302,7 @@ is assumed to operate on entire file.</dd>
 </div></blockquote>
 <p>User metrics that raise exceptions are caught and passed, with the error message written
 to unicity_compare_errors.txt for debugging.</p>
-<p>See examples/similarity_check.py for more details and examples.</p>
+<p>See example/similarity_check.py at <a class="reference external" href="https://https://github.com/ddempsey/unicity">https://https://github.com/ddempsey/unicity</a> for more details and examples.</p>
 </dd></dl>
 
 <dl class="method">
@@ -395,11 +393,14 @@ which the test method is called.</p>
 named client file (the file name passed to ‘expecting’ when constructing the Project.)</p>
 <p>The unit test should raise an error if the client’s code is in error. For instance
 an assert statement can be used to check a result is returned correctly.</p>
-<p>See examples/batch_testing.py for more details and examples.</p>
+<p>See example/batch_testing.py at <a class="reference external" href="https://https://github.com/ddempsey/unicity">https://https://github.com/ddempsey/unicity</a> for more details and examples.</p>
 </dd></dl>
 
 </dd></dl>
 
+</div>
+<div class="section" id="clients">
+<h2>Clients<a class="headerlink" href="#clients" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="unicity.Client">
 <em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">Client</code><span class="sig-paren">(</span><em>name</em>, <em>cohort=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Client" title="Permalink to this definition">¶</a></dt>
@@ -418,6 +419,9 @@ objects are provisioned attributes corresponding to column information
 in the cohort file.</p>
 </dd></dl>
 
+</div>
+<div class="section" id="comparisons">
+<h2>Comparisons<a class="headerlink" href="#comparisons" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="unicity.Comparison">
 <em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">Comparison</code><span class="sig-paren">(</span><em>loadfile</em>, <em>prior_project=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Comparison" title="Permalink to this definition">¶</a></dt>
@@ -453,6 +457,9 @@ object to read prior client information.</dd>
 
 </dd></dl>
 
+</div>
+<div class="section" id="pythonfiles">
+<h2>PythonFiles<a class="headerlink" href="#pythonfiles" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="unicity.PythonFile">
 <em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">PythonFile</code><span class="sig-paren">(</span><em>filename</em>, <em>zipfile</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.PythonFile" title="Permalink to this definition">¶</a></dt>
@@ -479,6 +486,9 @@ object to read prior client information.</dd>
 </dl>
 </dd></dl>
 
+</div>
+<div class="section" id="functioninfo-and-classinfo">
+<h2>FunctionInfo and ClassInfo<a class="headerlink" href="#functioninfo-and-classinfo" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="unicity.FunctionInfo">
 <em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">FunctionInfo</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.FunctionInfo" title="Permalink to this definition">¶</a></dt>
