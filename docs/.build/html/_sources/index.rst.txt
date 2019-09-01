@@ -44,15 +44,27 @@ Projects
 .. autoclass:: unicity.Project
 	:members:
 	
+Clients
+~~~~~~~
+
 .. autoclass:: unicity.Client
 	:members:
+	
+Comparisons
+~~~~~~~~~~~
 	
 .. autoclass:: unicity.Comparison
 	:members:
 
+PythonFiles
+~~~~~~~~~~~
+	
 .. autoclass:: unicity.PythonFile
 	:members:
-	
+
+FunctionInfo and ClassInfo
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 .. autoclass:: unicity.FunctionInfo
 	:members:
 
