@@ -1,0 +1,452 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>What is unicity? &#8212; unicity 0.2 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.2',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="what-is-unicity">
+<h1>What is unicity?<a class="headerlink" href="#what-is-unicity" title="Permalink to this headline">¶</a></h1>
+<p>I wrote this library to test the code in the hundreds of Python files submitted by my programming class. It also can be used to spot code submissions that are suspiciously similar.</p>
+<p>To get started, first install unicity using <code class="docutils literal"><span class="pre">pip</span></code>.</p>
+<p><code class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">unicity</span></code></p>
+<p>Then download the examples from <a class="reference external" href="https://github.com/ddempsey/unicity">https://github.com/ddempsey/unicity</a>. These will show you how to load a project, run a simple test, perform comparisons, and a few other tricks.</p>
+<p>Some disclaimers:</p>
+<ul class="simple">
+<li>I have discovered that students learning to code are very innovative in the ways in which they will break your work flow. Therefore, I have built in catches for <strong>directory changes</strong> and <strong>infinite loops</strong>. But there will be other things I have not anticipated. You may catch and handle these in your test function, but I’d also like to hear if you think something should be added to make the testing more robust.</li>
+<li>The similarity checking should be treated as a screening tool to highlight <em>potential</em> instances of copying. It does not (it cannot) assert that copying has actually occurred, and the best way to do that is by interview.</li>
+</ul>
+</div>
+<div class="section" id="python-classes">
+<h1>Python classes<a class="headerlink" href="#python-classes" title="Permalink to this headline">¶</a></h1>
+<p>Each submitter is called a <strong>client</strong>. Each client submits a <strong>portfolio</strong> of Python code. The set of all portfolios is called a <strong>project</strong>. The set of all clients is called a <strong>cohort</strong>.</p>
+<p>A project is a collection of Python files submitted by several different clients. They should be contained in a zip archive or folder. Each file should follow a particular naming convention</p>
+<p>`` {clientname}_*{expected_file}*.{ext} ``</p>
+<p>where <code class="docutils literal"><span class="pre">{expected_file.ext}</span></code> is passed as an argument to the <code class="docutils literal"><span class="pre">Project</span></code> constructor.</p>
+<p>Passing a path to a <code class="docutils literal"><span class="pre">cohort</span></code> file will give the <code class="docutils literal"><span class="pre">Project</span></code> additional data to tag each portfolio and report missing files.</p>
+<p>Test parts of the submission using the <code class="docutils literal"><span class="pre">test</span></code> method. This will require you to define a test function, that in turn calls functions or classes from a client’s portfolio.</p>
+<p>Check similarity metrics across the entire project with the <code class="docutils literal"><span class="pre">compare</span></code> method. You can compare particular methods, exclude similarity deriving from a common template, and compare with past projects.</p>
+<dl class="class">
+<dt id="unicity.Project">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">Project</code><span class="sig-paren">(</span><em>project, expecting, ignore=['*'], cohort=None, root=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for all client portfolios.</p>
+<dl class="docutils">
+<dt>project <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Path to folder or zip archive containing client portfolios.</dd>
+<dt>expecting <span class="classifier-delimiter">:</span> <span class="classifier">list (optional)</span></dt>
+<dd>List of expected file names in each portfolio.</dd>
+<dt>ignore <span class="classifier-delimiter">:</span> <span class="classifier">list (optional)</span></dt>
+<dd>List of file names to ignore (unix identifiers fine).</dd>
+<dt>cohort <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Path to file containing information about clients.</dd>
+<dt>root <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>String for naming of output files.</dd>
+</dl>
+<dl class="docutils">
+<dt>client <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>Dictionary of Client objects, keyed by client name.</dd>
+<dt>clientlist <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>List of Client objects, ordered alphabetically by client name.</dd>
+<dt>portfolio_status <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>Contains completeness information about individual client portfolios.</dd>
+<dt>test_status <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>Contains testing information about individual client portfolios.</dd>
+</dl>
+<dl class="docutils">
+<dt>findstr</dt>
+<dd>Look for string instances in client portfolios.</dd>
+<dt>dump_docstrings</dt>
+<dd>Write docstring information to file.</dd>
+<dt>compare</dt>
+<dd>Compute similarity metrics between client portfolios.</dd>
+<dt>similarity_report</dt>
+<dd>Produce a plot of similarity across the project.</dd>
+<dt>summarise</dt>
+<dd>Output a summary of the project.</dd>
+<dt>test</dt>
+<dd>Batch testing of the code.</dd>
+</dl>
+<p>Cohort file should contain client information in CSV format. The first row
+defines column names and must at least contain a ‘name’ column. Client information
+is given on separate rows.</p>
+<p>For example, the contents of ‘cohort.txt’</p>
+<p>name, firstname, surname, email
+johnsonjunko, junko, johnson, <a class="reference external" href="mailto:j&#46;johnson&#37;&#52;&#48;unicity&#46;co&#46;nz">j<span>&#46;</span>johnson<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
+trosttrisha, trisha, trost, <a class="reference external" href="mailto:t&#46;trost&#37;&#52;&#48;unicity&#46;co&#46;nz">t<span>&#46;</span>trost<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
+romoricki, ricki, romo, <a class="reference external" href="mailto:r&#46;romo&#37;&#52;&#48;unicity&#46;co&#46;nz">r<span>&#46;</span>romo<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a>
+mccardellmirta, mirta,mccardell, <a class="reference external" href="mailto:m&#46;mccardell&#37;&#52;&#48;unicity&#46;co&#46;nz">m<span>&#46;</span>mccardell<span>&#64;</span>unicity<span>&#46;</span>co<span>&#46;</span>nz</a></p>
+<p>Each column is provisioned as a separate attribute for each client as discovered. If the
+‘email’ attribute is present, this will be reported in output.</p>
+<dl class="method">
+<dt id="unicity.Project.compare">
+<code class="descname">compare</code><span class="sig-paren">(</span><em>routine</em>, <em>metric='command_freq'</em>, <em>ncpus=1</em>, <em>template=None</em>, <em>prior_project=None</em>, <em>prior_routine=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.compare" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compares pairs of portfolios for similarity between implemented Python routine.</p>
+<dl class="docutils">
+<dt>routine <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Callable sequence in unicity format for comparison at three levels: {file}, 
+{file}/{function} or {file}/{class}.{method}.</dd>
+<dt>metric <span class="classifier-delimiter">:</span> <span class="classifier">str, callable (optional)</span></dt>
+<dd>Distance metric for determining similarity. See below for more information on
+the different metrics available. Users can pass their own metric functions but
+these must adhere to the specification below. (default ‘command_freq’)</dd>
+<dt>ncpus <span class="classifier-delimiter">:</span> <span class="classifier">int (optional)</span></dt>
+<dd>Number of CPUs to use when running comparisons. (default 1, single thread)</dd>
+<dt>template <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>File path to Python template file for referencing the comparison.</dd>
+<dt>prior_project <span class="classifier-delimiter">:</span> <span class="classifier">unicity.Project (optional)</span></dt>
+<dd>Project object for different cohort. Check current cohort for similarities with 
+previous. Comparisons will not be made between clients of the previous project.</dd>
+<dt>prior_routine <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Callable sequence in unicity format for comparison from prior_project. If not given,
+will default to routine.</dd>
+</dl>
+<dl class="docutils">
+<dt>c <span class="classifier-delimiter">:</span> <span class="classifier">unicity.Comparison</span></dt>
+<dd>Object containing comparison information.</dd>
+</dl>
+<p>A template file is specified when Python files are likely to exhibit similarity
+due to portfolios developed from a common template. Each portfolio is compared 
+to the template for similarity, and this is ‘subtracted’ from any similarity 
+between a pair of portfolios.</p>
+<p>Exercise caution when drawing conclusions of similarity between short code snippets as
+this increases the likelihood of false positives.</p>
+<dl class="docutils">
+<dt>command_freq (default) <span class="classifier-delimiter">:</span> <span class="classifier">Compares the frequency of distinct commands in two scripts. </span></dt>
+<dd>Commands counted include all callables (function/methods), control statements 
+(if/elif/else), looping statements (for/while/continue/break), boolean operators 
+(and/or/not) and try/except.</dd>
+</dl>
+<p>jaro : Compares the order of the statements above for matches and transpositions.</p>
+<p>User can pass their own callable that computes a distance metric between two files. The
+specification for this callable is</p>
+<blockquote>
+<div><dl class="docutils">
+<dt>file1 <span class="classifier-delimiter">:</span> <span class="classifier">File</span></dt>
+<dd>Python File object for client 1.</dd>
+<dt>file2 <span class="classifier-delimiter">:</span> <span class="classifier">File</span></dt>
+<dd>Python File object for client 2.</dd>
+<dt>template <span class="classifier-delimiter">:</span> <span class="classifier">File</span></dt>
+<dd>Python File object for template file.</dd>
+<dt>name1 <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Routine name in first file for comparison. If not given, the comparison 
+is assumed to operate on entire file.</dd>
+<dt>name2 <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Routine name in second file for comparison. If not given, the comparison 
+is assumed to operate on entire file.</dd>
+</dl>
+<dl class="docutils">
+<dt>dist <span class="classifier-delimiter">:</span> <span class="classifier">float</span></dt>
+<dd>Float between 0 and 1 indicating degree of similarity (0 = highly similar,
+1 = highly dissimilar).</dd>
+</dl>
+</div></blockquote>
+<p>User metrics that raise exceptions are caught and passed, with the error message written
+to unicity_compare_errors.txt for debugging.</p>
+<p>See examples/similarity_check.py for more details and examples.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="unicity.Project.dump_docstrings">
+<code class="descname">dump_docstrings</code><span class="sig-paren">(</span><em>routine</em>, <em>save</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.dump_docstrings" title="Permalink to this definition">¶</a></dt>
+<dd><p>Writes docstring information out to file.</p>
+<dl class="docutils">
+<dt>routine <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Callable sequence in unicity format {file}/{function}, or
+{file}/{class}.{method}.</dd>
+<dt>save <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>File path to write docstrings.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="unicity.Project.findstr">
+<code class="descname">findstr</code><span class="sig-paren">(</span><em>string</em>, <em>location=None</em>, <em>verbose=False</em>, <em>save=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.findstr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check portfolio for instances of string.</p>
+<dl class="docutils">
+<dt>string <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>String to locate in portfolios.</dd>
+<dt>location <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Search limited to particular file, class or routine, specified in unicity format
+<em>file</em>, <em>file</em>/<em>function</em>, or <em>file</em>/<em>class</em>.*method*.</dd>
+<dt>verbose <span class="classifier-delimiter">:</span> <span class="classifier">bool (optional)</span></dt>
+<dd>Flag to print discovered strings to screen (default False).</dd>
+<dt>save <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>File to save results of string search.</dd>
+</dl>
+<dl class="docutils">
+<dt>found_clients <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Client objects whose portfolios contain the search string.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="unicity.Project.similarity_report">
+<code class="descname">similarity_report</code><span class="sig-paren">(</span><em>comparison</em>, <em>client=None</em>, <em>save=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.similarity_report" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a summary of similarity metrics.</p>
+<dl class="docutils">
+<dt>comparison <span class="classifier-delimiter">:</span> <span class="classifier">unicity.Comparison</span></dt>
+<dd>Comparison object produced by Project.compare.</dd>
+<dt>client <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Name of client to highlight or ‘anon’ for anonymised report.</dd>
+<dt>save <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Name of output file (default to {clientname}_{function}.png).</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="unicity.Project.summarise">
+<code class="descname">summarise</code><span class="sig-paren">(</span><em>save</em>, <em>verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.summarise" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create log file with portfolio information.</p>
+<dl class="docutils">
+<dt>save <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>File path to save output summary.</dd>
+<dt>verbose <span class="classifier-delimiter">:</span> <span class="classifier">bool (optional)</span></dt>
+<dd>Print output to screen as well.</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="unicity.Project.test">
+<code class="descname">test</code><span class="sig-paren">(</span><em>routine</em>, <em>ncpus=1</em>, <em>language='python'</em>, <em>client=None</em>, <em>timeout=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Project.test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Runs test suite for function name.</p>
+<dl class="docutils">
+<dt>routine <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name of unit test function (not a function handle).</dd>
+<dt>ncpus <span class="classifier-delimiter">:</span> <span class="classifier">int (optional)</span></dt>
+<dd>Number of CPUs to use when running comparisons. (default 1, single thread)</dd>
+<dt>client <span class="classifier-delimiter">:</span> <span class="classifier">str (optional)</span></dt>
+<dd>Run test for individual client, writing their code out to file. (default is to run
+test for all clients.)</dd>
+<dt>timeout <span class="classifier-delimiter">:</span> <span class="classifier">float (optional)</span></dt>
+<dd>Time after which test should be exited. Only use timeout if you think there 
+is the possiblity of infinite loops. Using a timeout will impact performance. 
+Timeout only implemented for serial. (default is no timeout)</dd>
+<dt>language <span class="classifier-delimiter">:</span> <span class="classifier">python</span></dt>
+<dd>Type of test to run. Base class supports ‘python’ only. Additional tests can
+be added by subclassing and defining new method _test_{language}.</dd>
+<dt><a href="#id1"><span class="problematic" id="id2">**</span></a>kwargs </dt>
+<dd>Passed to language specific method _test_{language}</dd>
+</dl>
+<p>Testing proceeds by running a unit test function defined within the script from
+which the test method is called.</p>
+<p>The unit test should contain at least one import statement to the generically
+named client file (the file name passed to ‘expecting’ when constructing the Project.)</p>
+<p>The unit test should raise an error if the client’s code is in error. For instance
+an assert statement can be used to check a result is returned correctly.</p>
+<p>See examples/batch_testing.py for more details and examples.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="unicity.Client">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">Client</code><span class="sig-paren">(</span><em>name</em>, <em>cohort=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Client" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class for individual client.</p>
+<dl class="docutils">
+<dt>name <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name associated with client.</dd>
+<dt>files <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>Dictionary of File objects, keyed by file name, associated with the 
+client’s portfolio.</dd>
+<dt>missing <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Expected files missing from the client’s portfolio.</dd>
+</dl>
+<p>When created by a Project object with an associated cohort file, Client
+objects are provisioned attributes corresponding to column information
+in the cohort file.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="unicity.Comparison">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">Comparison</code><span class="sig-paren">(</span><em>loadfile</em>, <em>prior_project=None</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Comparison" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class for batch comparisons of code.</p>
+<dl class="docutils">
+<dt>loadfile <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>File path to previously saved comparison object.</dd>
+<dt>prior_project <span class="classifier-delimiter">:</span> <span class="classifier">unicity.Project (optional)</span></dt>
+<dd>If comparison was constructed against a prior project, pass this
+object to read prior client information.</dd>
+</dl>
+<dl class="docutils">
+<dt>matrix <span class="classifier-delimiter">:</span> <span class="classifier">array-like</span></dt>
+<dd>Distance matrix of similarities.</dd>
+<dt>routine <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Code unit for comparison in unicity string format.</dd>
+<dt>prior_routine <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Code unit for prior comparison in unicity string format.</dd>
+</dl>
+<dl class="docutils">
+<dt>save </dt>
+<dd>Write comparison data to file.</dd>
+</dl>
+<dl class="method">
+<dt id="unicity.Comparison.save">
+<code class="descname">save</code><span class="sig-paren">(</span><em>savefile</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.Comparison.save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a precomputed comparison file.</p>
+<dl class="docutils">
+<dt>savefile <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name of file to save similarity data.</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="unicity.PythonFile">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">PythonFile</code><span class="sig-paren">(</span><em>filename</em>, <em>zipfile</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.PythonFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class containing information about Python file.</p>
+<dl class="docutils">
+<dt>all_calls <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>All callables in file, in order of appearance.</dd>
+<dt>all_keywords <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>All callables and reserved keywords in file, in order of appearance.</dd>
+<dt>classes <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>ClassInfo objects corresponding to classes defined in file.</dd>
+<dt>filename <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name of file.</dd>
+<dt>functions <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>FunctionInfo objects corresponding to callables defined in file.</dd>
+<dt>import_froms <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>List of [module, thing] import from statements in from {module} import {thing} format.</dd>
+<dt>import_lines <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Line numbers of import statements.</dd>
+<dt>lns <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Text of file.</dd>
+<dt>reserved <span class="classifier-delimiter">:</span> <span class="classifier">dict</span></dt>
+<dd>Frequency of reserved keywords.</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="unicity.FunctionInfo">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">FunctionInfo</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.FunctionInfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class containing information about Python callable.</p>
+<dl class="docutils">
+<dt>all_keywords <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>All callables and reserved keywords in file, in order of appearance.</dd>
+<dt>docstring <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Docstring for the function.</dd>
+<dt>funcs <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of functions called within this function.</dd>
+<dt>import_froms <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>List of [module, thing] import from statements in from {module} import {thing} format.</dd>
+<dt>lineno <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>First and last line number of function in file.</dd>
+<dt>lns <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Text of function.</dd>
+<dt>methods <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of methods called within the function.</dd>
+<dt>name <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name of the funtion.</dd>
+<dt>names <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>A python ast category I don’t fully understand but useful for catching when
+the client invokes an Exception.</dd>
+<dt>user_classes <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of classes defined by the client and used within this function.</dd>
+<dt>user_funcs <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of functions defined by the client and used within this funcion.</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="unicity.ClassInfo">
+<em class="property">class </em><code class="descclassname">unicity.</code><code class="descname">ClassInfo</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#unicity.ClassInfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Class containing information about Python class.</p>
+<dl class="docutils">
+<dt>all_keywords <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>All callables and reserved keywords in file, in order of appearance.</dd>
+<dt>base <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Base class.</dd>
+<dt>defs <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of methods defined within the class.</dd>
+<dt>docstring <span class="classifier-delimiter">:</span> <span class="classifier">string</span></dt>
+<dd>Docstring for the class.</dd>
+<dt>lineno: list</dt>
+<dd>First and last line number of class definition in file.</dd>
+<dt>lns <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Text of class.</dd>
+<dt>methods <span class="classifier-delimiter">:</span> <span class="classifier">list</span></dt>
+<dd>Names of methods called within the class.</dd>
+<dt>name <span class="classifier-delimiter">:</span> <span class="classifier">str</span></dt>
+<dd>Name of the class.</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, David Dempsey.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.6</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

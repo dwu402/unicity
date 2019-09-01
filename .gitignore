@@ -3,9 +3,6 @@
 __pycache__
 build
 dist
-.build
-.static
-.templates
 *.bat
 unicity.egg-info
 .vscode
