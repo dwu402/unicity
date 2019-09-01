@@ -19,10 +19,7 @@
 #
 import os
 import sys
-sys.path.append(os.path.abspath('../../unicity'))
-sys.path.append(os.path.abspath('../unicity'))
-sys.path.append(os.path.abspath('unicity'))
-
+sys.path.append(os.path.abspath('..'))
 
 # -- General configuration ------------------------------------------------
 

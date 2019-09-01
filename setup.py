@@ -13,6 +13,7 @@ setuptools.setup(
 	long_description=long_description,
 	long_description_content_type="text/markdown",
 	packages=setuptools.find_packages(),
+	install_requires=['numpy','scipy','matplotlib','fuzzywuzzy',],
 	url="https://github.com/ddempsey/unicity",
 	classifiers=[
 		 "Programming Language :: Python :: 3",
