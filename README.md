@@ -1,19 +1,19 @@
 # unicity
 
-I wrote this library to test the code in the hundreds of Python files submitted by my programming class. It also can be used to spot code submissions that are suspiciously similar.
+I wrote this library to test and debug code from hundreds of Python files submitted by my programming class. It can also be used to find code submissions that are suspiciously similar.
 
-To get started, first install unicity using ``pip``.
+To get started, install unicity using ``pip``.
 
 ```bash
 pip install unicity
 ```
 
-Then download the and run the scripts in the examples folder, particularly loading_projects.py, batch_testing.py and similarity_check.py.
+Then, download the and run the scripts in the ``example`` folder above. Start with ``loading_projects.py``, ``batch_testing.py`` and ``similarity_check.py``.
 
 Some disclaimers:
 
-- I have discovered that students learning to code are very innovative in the ways in which they will break your work flow. Therefore, I have built in catches for **directory changes** and **infinite loops**. But there will be other things I have not anticipated. You may catch and handle these in your test function, but I'd also like to hear if you think something should be added to make the testing more robust.
+- I have discovered that when students are learning to code, they are very innovative in the ways they will find to break your work flow. So far, I have built support to catch and handle **directory changes** and **infinite loops**, but I'm sure there are more suprises out there! You can catch and handle these yourself in the way you define a test function, but I'd also like to hear if you think something should be added to make unicity testing more robust.
 
-- The similarity checking should be treated as a screening tool to highlight *potential* instances of copying. It does not (it cannot) assert that copying has actually occurred, and the best way to do that is by interview.
+- Similarity checking should be treated as a screening tool to highlight *potential* instances of copying. It does not (it cannot) assert that copying has in fact occurred. The best way to do that is by a follow up interview.
 
 More documentation at [readthedocs](https://unicity.readthedocs.io/en/latest/).
