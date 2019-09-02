@@ -1062,7 +1062,7 @@ class Project(object):
 
         c._prior_clientlist = prior_clientlist
         return c
-    # testing methods\
+    # testing methods
     def test(self, routine, ncpus = 1, language='python', client=None, timeout = None, 
         **kwargs):
         ''' Runs test suite for function name.
@@ -1182,8 +1182,6 @@ class Project(object):
             errs = _run_tests(ncpus, pars, timeout)
         else:
             # running test for just one client
-            # run test 
-            #err = _run_test(1, pars[0], None)
             err = _run_tests(1, pars, timeout)[0]
             
             # debug - write test to file with err as docstring
@@ -1205,20 +1203,6 @@ class Project(object):
             if type(err) is int:
                 # test suite did not run (various reasons)
                 cl.failed_test_suite = err
-                # fp = open(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine),'w')
-                # fp.write('failure code {:d}: '.format(err))
-                # if err == -1:
-                #     fp.write('no file')
-                # elif err == -3:
-                #     fp.write('syntax errors')
-                #     for fl in cl.files:
-                #         if fl._tree == -1:
-                #             fp.write('\n\n{:s}'.format(fl._tree_err))
-                # elif err == -4:
-                #     fp.write('timeout when running code')
-                # else:
-                #     raise 'failure code not recognised'
-                # fp.close()
                 _save_test(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine), err, lns, cl)
                 continue
             elif err == '':
