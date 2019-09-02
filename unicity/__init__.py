@@ -1698,6 +1698,9 @@ def _run_tests(ncpus, pars, timeout):
             manager = Manager()
             errs = manager.dict()
             for i,par in enumerate(pars):
+                if type(par) is int: 
+                    errs[i] = par
+                    continue
                 p = Process(target=_run_test_timeout, args=(i, par, errs))
                 p.start()
                 p.join(timeout)
