@@ -8,17 +8,17 @@ def test_function():
     # The unit test must include an import statement to a Python modules the 
     # client is presumed to have supplied. This is the only way to access their code.
     
-    # In this case, I am importing the Network object from functions.py.
-    from functions import Network
+    # In this case, I am importing the Grid object assumed to be in functions.py.
+    from functions import Grid
 
     # Create an object and use a method.
-    network = Network()								
-    network.add_node('A', 2)						
-    ndA = network.get_node('A')						
+    grid = Grid()								
+    grid.add_station('A', 2)						
+    statA = grid.query_station('A')						
 
-    # Check the add_node method is working correctly.
-    assert(ndA.name == 'A')							
-    assert(ndA.value == 2)
+    # Check the query_station method is working correctly.
+    assert(statA.id == 'A')							
+    assert(statA.val == 2)
 
 def test_simple_method():
     # load project
@@ -29,14 +29,14 @@ def test_simple_method():
     proj.test('test_function')
 
     # If a client fails, a testing script is automatically written out.
-    # E.g., deyodorie fails, producing failed_test0/test_deyodorie_test0.py
+    # E.g., deyodorie fails, producing failed_test_function/test_deyodorie_test_function.py
 
     # Failed test scripts can be run and debugged directly.
     # For example: 
-    #   python test_deyodorie_test0.py
+    #   python test_deyodorie_test_function.py
     # will replicate the error.
     #
-    # To fix the error, change 'self' to 'node' on lines 76 and 77. Rerun 
+    # To fix the error, change 'self' to 'stat' on lines 42 and 43. Rerun 
     # the script to confirm the source of failure.
 
 def test_method_specific_client():
