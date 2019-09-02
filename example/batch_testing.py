@@ -63,6 +63,18 @@ def test_and_summarise():
     # details of the test suite will be appended to the summary report
     proj.summarise('example_project.log')
 
+def test_with_timeout():
+    # load project
+    proj = Project('example_project.zip', expecting = ['functions.py'])
+
+    # If the test method is not completing, a client may have written an infinite loop
+    # that is not being caught. Run test with the timeout flag to set a limit of how long
+    # individual tests can run (note, won't work with multiprocessing.)
+
+    # The timeout below is for 1 second. That probably won't catch many of these examples
+    # unless you're running a slow computer ;)
+    proj.test('test_function', timeout=1.)
+
 if __name__ == "__main__":
     test_simple_method()
 
@@ -71,3 +83,5 @@ if __name__ == "__main__":
     #test_method_multiprocessing()
     
     #test_and_summarise()
+
+    #test_with_timeout()
