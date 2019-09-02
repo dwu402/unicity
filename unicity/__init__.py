@@ -956,6 +956,8 @@ class Project(object):
         if template is not None:
             assert os.path.isfile(template), 'cannot find template file {:s}'.format(template)
             template = PythonFile(template, zipfile=None)
+            if template._tree == -1:
+                raise UnicityError("Cannot perform compare due to syntax errors in \'{:s}\' - see below:\n\n{:s}".format(template.filename, template._tree_err))
 
         # preparation for prior project
         if prior_project is not None:
@@ -1203,17 +1205,21 @@ class Project(object):
             if type(err) is int:
                 # test suite did not run (various reasons)
                 cl.failed_test_suite = err
-                fp = open(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine),'w')
-                fp.write('failure code {:d}: '.format(err))
-                if err == -1:
-                    fp.write('no file')
-                elif err == -3:
-                    fp.write('syntax errors')
-                elif err == -4:
-                    fp.write('timeout when running code')
-                else:
-                    raise 'failure code not recognised'
-                fp.close()
+                # fp = open(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine),'w')
+                # fp.write('failure code {:d}: '.format(err))
+                # if err == -1:
+                #     fp.write('no file')
+                # elif err == -3:
+                #     fp.write('syntax errors')
+                #     for fl in cl.files:
+                #         if fl._tree == -1:
+                #             fp.write('\n\n{:s}'.format(fl._tree_err))
+                # elif err == -4:
+                #     fp.write('timeout when running code')
+                # else:
+                #     raise 'failure code not recognised'
+                # fp.close()
+                _save_test(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine), err, lns, cl)
                 continue
             elif err == '':
                 # test suite passed - do not modify failure flag, unless not already defined
@@ -1563,8 +1569,12 @@ class PythonFile(BaseFile):
         # load the ast tree
         try:
             self._tree = ast.parse(''.join(self.lns))
+            self._tree_err = ''
         except SyntaxError:
             self._tree = -1
+            self._tree_err = ''
+            self._tree_err += str(traceback.format_exc())+'\n'
+            self._tree_err += str(sys.exc_info()[0])
             return
         # visit nodes in the tree
         fv = _FunctionVisitor()
@@ -1751,7 +1761,7 @@ def _run_test(lns):
         err += str(traceback.format_exc())+'\n'
         err += str(sys.exc_info()[0])
     return (i,err)
-def _save_test(fl, err, lns):
+def _save_test(fl, err, lns, cl = None):
     if type(err) is int:
         # test suite did not run (various reasons)
         fp = open(fl,'w')
@@ -1760,6 +1770,9 @@ def _save_test(fl, err, lns):
             fp.write('no file')
         elif err == -3:
             fp.write('syntax errors')
+            for fli in cl.files.values():
+                if fli._tree == -1:
+                    fp.write('\n\n{:s}'.format(fli._tree_err))
         elif err == -4:
             fp.write('timeout when running code')
         else:
