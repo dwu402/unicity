@@ -1,0 +1,12 @@
+info = actxcontrollist
+c = actxcontrolselect
+[c, info] = actxcontrolselect
+alpha value
+alpha alphadata
+alpha facealpha
+alpha alphadatamapping
+r = analyzeCodeCompatibility
+A & B
+an = animatedline
+ans
+appdesigner

@@ -1,3 +1,5 @@
+import os,sys
+sys.path.insert(0, os.path.abspath('..'))
 from unicity import Project, Comparison 
 
 def similarity_check():
@@ -47,8 +49,16 @@ def save_and_load_comparisons():
     # plot similarity check
     proj.similarity_report(comp_loaded)
 
+def similarity_check_matlab():
+    # load Project
+    proj = Project(r'C:\Users\ddem014\Downloads\submissions_matlab.zip', expecting=['improved_euler_solve.m'])
+    # run similarity check using Jaro distance between strings
+    #comp = proj.compare('functions.m')
+    # plot similarity check
+    #proj.similarity_report(comp)
+
 if __name__ == "__main__":
-    similarity_check()
+    #similarity_check()
     
     #similarity_check_with_template()
 
@@ -57,3 +67,5 @@ if __name__ == "__main__":
     #similarity_check_jaro()
 
     #save_and_load_comparisons()
+
+    similarity_check_matlab()

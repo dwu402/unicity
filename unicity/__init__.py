@@ -1685,7 +1685,73 @@ class PythonFile(BaseFile):
             call_dict[call] = call_dict[call] + 1
         call_dict.update(self.reserved)
         return call_dict
+class MATLABFile(BaseFile):
+    ''' Class containing information about MATLAB file.
 
+        Attributes:
+        -----------
+        
+    '''
+    def __init__(self, filename, zipfile):
+        super(MATLABFile,self).__init__(filename, zipfile)
+        self._parse_file()
+    def _parse_file(self):
+        ''' Parse MATLAB file for function definition info.
+        '''
+        split_counts = ['for','if','else','false','true']
+        specials = ['anon_at']
+        builtins = ['round','ceil','floor','ones','mat2cell','eye','numel','plot','figure','zeros','legend',
+        'xlabel','ylabel','xlim','ylim','saveas','assert','norm','disp','exist','line','text','num2str','mod',
+        'eval','annotation','length','linspace','min','max','title','sin','cos','tan','abs','']
+        builtins2 = ['clear','clc','clearvars','hold','hold_on','hold_off','figure']
+        self.all_keywords = []
+
+        # parse line by line using regex
+        for ln in self.lns:
+            # strip off comments and skip empty lines
+            ln = ln.split('%')[0].strip()
+            if ln == '':
+                continue
+
+            # parse keywords
+            for special in specials:
+                counts = self.__getattribute__('_count_{:s}'.format(special))(ln)
+                for i in range(counts):
+                    self.all_keywords.append(special)
+                    
+            # parse split counts
+            for split_count in split_counts:
+                counts = self._split_count(split_count, ln)
+                for i in range(counts):
+                    self.all_keywords.append(split_count)
+            
+            # parse builtin functions
+            for builtin in builtins:
+                counts = self._count_builtin(builtin, ln)
+                for i in range(counts):
+                    self.all_keywords.append(builtin)
+            
+            # parse builtin statements
+            for builtin2 in builtins2:
+                counts = self._count_builtin2(builtin2, ln)
+                for i in range(counts):
+                    self.all_keywords.append(builtin2)
+
+        self.all_keywords = None
+        #self.reserved = None
+        
+    def _split_count(self, nm, ln):
+        return ln.split().count(nm)
+    def _count_anon_at(self, ln):
+        return ln.count('@')
+    def _count_builtin(self, builtin, ln):
+        return ln.count('{}('.format(builtin))
+    def _count_builtin2(self, builtin2, ln):
+        if ln == builtin2.replace('_',' '):
+            return 1
+        else:
+            return 0
+    
 # Exceptions
 class UnicityError(Exception):
     pass
@@ -1807,7 +1873,7 @@ def _File(filename, zipfile=None):
     elif ext == 'txt':
         return TxtFile(filename, zipfile=zipfile)
     elif ext == 'm':
-        return TxtFile(filename, zipfile=zipfile)
+        return MATLABFile(filename, zipfile=zipfile)
     elif ext == 'c':
         return CFile(filename, zipfile=zipfile)
     elif ext == 'md':
