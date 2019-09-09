@@ -494,7 +494,10 @@ class Project(object):
             
             # check if zipfile submission
             elif fl.lower().endswith('.zip'):
-                zf2 = zipfile.ZipFile(BytesIO(zf.read(fl)))
+                if self._projdir is not None:
+                    zf2 = zipfile.ZipFile(fl)
+                else:
+                    zf2 = zipfile.ZipFile(BytesIO(zf.read(fl)))
                 fls2 = [fl2.filename for fl2 in zf2.filelist]
                 for fl2 in fls2:
                     ratios = [_check_fuzzy_ratio(fl2, expect) for expect in self._expecting]
