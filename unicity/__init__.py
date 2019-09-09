@@ -3,6 +3,7 @@ import numpy as np
 from itertools import starmap
 from functools import partial
 from copy import copy
+from io import BytesIO
 from itertools import chain
 from multiprocessing import Pool, Process, Manager
 from matplotlib import pyplot as plt
@@ -489,12 +490,22 @@ class Project(object):
             # accept above (arbitrary) threshold
             if max(ratios)>75:
                 fl0 = self._expecting[np.argmax(ratios)]
-            else:
-                # check against ignore list
-                self._ignore(fl)
-                continue 
+                client.files.update({fl0:_File(fl, zf)})            # save file information
+            
+            # check if zipfile submission
+            elif fl.lower().endswith('.zip'):
+                zf2 = zipfile.ZipFile(BytesIO(zf.read(fl)))
+                fls2 = [fl2.filename for fl2 in zf2.filelist]
+                for fl2 in fls2:
+                    ratios = [_check_fuzzy_ratio(fl2, expect) for expect in self._expecting]
+                    if max(ratios)>75:
+                        fl0 = self._expecting[np.argmax(ratios)]
+                        client.files.update({fl0:_File(fl2, zf2)})            # save file information
 
-            client.files.update({fl0:_File(fl, zf)})            # save file information
+            # check if ignorable
+            else:
+                self._ignore(fl)
+
         
         # sort clients alphabetically 
         self.clientlist = sorted(self.clientlist, key = lambda x: x.name)

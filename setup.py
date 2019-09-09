@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
 	name='unicity',  
-	version='0.4',
+	version='0.5',
 	py_modules=['unicity'],
 	author="David Dempsey",
 	author_email="ddempsey786@gmail.com",
