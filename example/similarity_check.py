@@ -51,11 +51,12 @@ def save_and_load_comparisons():
 
 def similarity_check_matlab():
     # load Project
-    proj = Project(r'C:\Users\ddem014\Downloads\submissions_matlab.zip', expecting=['improved_euler_solve.m'])
-    # run similarity check using Jaro distance between strings
-    #comp = proj.compare('functions.m')
+    proj = Project(r'D:\code\unicity_tests\submissions_matlab', expecting=['improved_euler_solve.m'])
+    #proj
+    # run similarity check
+    comp = proj.compare('improved_euler_solve.m')
     # plot similarity check
-    #proj.similarity_report(comp)
+    proj.similarity_report(comp)
 
 if __name__ == "__main__":
     #similarity_check()

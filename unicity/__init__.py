@@ -14,6 +14,7 @@ from scipy.spatial.distance import squareform
 from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
+from unicity.mrtns import get_fns, get_stmts
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # silent warning on fuzzywuzzy import
@@ -418,6 +419,10 @@ class Project(object):
         self._parse_filepath()
         self._expecting = expecting
         self._ignore_files = ignore
+        # get compiled regexes, first is keyword match sequence, second is keyword overwrite sequence
+        extended = False
+        self._mrtns_fns = get_fns(extended)
+        self._mrtns_stmts = get_stmts(extended)
         self._run_test = False
         frame = inspect.stack()[1]
         module = inspect.getmodule(frame[0])
@@ -489,8 +494,15 @@ class Project(object):
 
             # accept above (arbitrary) threshold
             if max(ratios)>75:
+                # check if not already an existing file with a (higher) fuzzy match
                 fl0 = self._expecting[np.argmax(ratios)]
-                client.files.update({fl0:_File(fl, zf)})            # save file information
+                if fl0 in client.files.keys():
+                    if max(ratios) > client.files[fl0]._fuzzy_match:
+                        client.files[fl0] = _File(fl, zf, self)
+                        client.files[fl0]._fuzzy_match = max(ratios)
+                else:
+                    client.files.update({fl0:_File(fl, zf, self)})            # save file information
+                    client.files[fl0]._fuzzy_match = max(ratios)
             
             # check if zipfile submission
             elif fl.lower().endswith('.zip'):
@@ -502,14 +514,20 @@ class Project(object):
                 for fl2 in fls2:
                     ratios = [_check_fuzzy_ratio(fl2, expect) for expect in self._expecting]
                     if max(ratios)>75:
+                        # check if not already an existing file with a (higher) fuzzy match
                         fl0 = self._expecting[np.argmax(ratios)]
-                        client.files.update({fl0:_File(fl2, zf2)})            # save file information
+                        if fl0 in client.files.keys():
+                            if max(ratios) > client.files[fl0]._fuzzy_match:
+                                client.files[fl0] = _File(fl2, zf2, self)
+                                client.files[fl0]._fuzzy_match = max(ratios)
+                        else:
+                            client.files.update({fl0:_File(fl2, z2f, self)})            # save file information
+                            client.files[fl0]._fuzzy_match = max(ratios)
 
             # check if ignorable
             else:
                 self._ignore(fl)
 
-        
         # sort clients alphabetically 
         self.clientlist = sorted(self.clientlist, key = lambda x: x.name)
 
@@ -1480,7 +1498,7 @@ class ClassInfo(object):
 class BaseFile(object):
     ''' Class for generic file.
     '''
-    def __init__(self, filename, projzip):
+    def __init__(self, filename, projzip, parent):
         self.filename = filename
         self._projzip = projzip
         if filename is not None:
@@ -1692,18 +1710,29 @@ class MATLABFile(BaseFile):
         -----------
         
     '''
-    def __init__(self, filename, zipfile):
-        super(MATLABFile,self).__init__(filename, zipfile)
-        self._parse_file()
-    def _parse_file(self):
+    def __init__(self, filename, zipfile, parent):
+        super(MATLABFile,self).__init__(filename, zipfile, parent)
+        self._tree = None
+        self._parse_file(parent._mrtns_fns, parent._mrtns_stmts)
+    def _parse_file(self, fns, stmts):
         ''' Parse MATLAB file for function definition info.
         '''
-        split_counts = ['for','if','else','false','true']
-        specials = ['anon_at']
-        builtins = ['round','ceil','floor','ones','mat2cell','eye','numel','plot','figure','zeros','legend',
-        'xlabel','ylabel','xlim','ylim','saveas','assert','norm','disp','exist','line','text','num2str','mod',
-        'eval','annotation','length','linspace','min','max','title','sin','cos','tan','abs','']
-        builtins2 = ['clear','clc','clearvars','hold','hold_on','hold_off','figure']
+        extended = False
+        
+        specials = ['anon_at','ampersand']
+        specials = [(spec, spec, spec) for spec in specials]
+        
+        reserved = ['for','if','else','false','true']
+        reserved = [(res, re.compile(r'\W{:s}\W'.format(res)), re.compile(r'{:s}\s*='.format(res))) for res in reserved]
+        
+        # assemble check lists, exclusions lists and methods
+            # lists for checking
+        lists = [list(enumerate(ls)) for ls in [fns, reserved, stmts, specials]]
+            # indices to check
+        inds = [list(np.arange(len(ls))) for ls in lists]
+            # method to run
+        methods = [self._count_, self._count_, self._count_, self._count_special]
+
         self.all_keywords = []
 
         # parse line by line using regex
@@ -1712,46 +1741,41 @@ class MATLABFile(BaseFile):
             ln = ln.split('%')[0].strip()
             if ln == '':
                 continue
-
-            # parse keywords
-            for special in specials:
-                counts = self.__getattribute__('_count_{:s}'.format(special))(ln)
-                for i in range(counts):
-                    self.all_keywords.append(special)
-                    
-            # parse split counts
-            for split_count in split_counts:
-                counts = self._split_count(split_count, ln)
-                for i in range(counts):
-                    self.all_keywords.append(split_count)
+            # remove semi colons WHAT IS THE POINT
+            ln = ln.replace(';','')
             
-            # parse builtin functions
-            for builtin in builtins:
-                counts = self._count_builtin(builtin, ln)
-                for i in range(counts):
-                    self.all_keywords.append(builtin)
-            
-            # parse builtin statements
-            for builtin2 in builtins2:
-                counts = self._count_builtin2(builtin2, ln)
-                for i in range(counts):
-                    self.all_keywords.append(builtin2)
-
-        self.all_keywords = None
-        #self.reserved = None
-        
-    def _split_count(self, nm, ln):
-        return ln.split().count(nm)
+            # loop over statement lists and counting methods
+            for lst, meth, ind in zip(lists, methods,inds):
+                rem = []
+                for i,ls in [lst[i] for i in ind]:
+                    # check if statement name overwritten by user
+                    match = re.match(ls[2], ln.replace(' ','').replace('\t',''))
+                    if match:
+                        rem.append(i)
+                        continue
+                    # count statement frequency
+                    counts = meth(ls[1], ln)
+                    for i in range(counts):
+                        self.all_keywords.append(ls[0])
+                # remove user overwritten statements from future checks
+                for i in rem[::-1]: 
+                    ind.remove(i)
+    def _count_special(self, special, ln):
+        return self.__getattribute__('_count_{:s}'.format(special))(ln)   
     def _count_anon_at(self, ln):
         return ln.count('@')
-    def _count_builtin(self, builtin, ln):
-        return ln.count('{}('.format(builtin))
-    def _count_builtin2(self, builtin2, ln):
-        if ln == builtin2.replace('_',' '):
-            return 1
-        else:
-            return 0
-    
+    def _count_ampersand(self, ln):
+        return ln.count('&')
+    def _count_(self, fn, ln):
+        return len(re.findall(fn,' '+ln+' '))
+    def _get_calls(self, name):
+        ''' Return dictionary of callables and their frequency.
+        '''
+        unique_calls = list(set(self.all_keywords))
+        call_dict = dict([(k,0) for k in unique_calls])
+        for call in self.all_keywords:
+            call_dict[call] = call_dict[call] + 1
+        return call_dict 
 # Exceptions
 class UnicityError(Exception):
     pass
@@ -1858,7 +1882,7 @@ def _save_test(fl, err, lns, cl = None):
     for ln in lns: 
         fp.write(ln.rstrip()+'\n')
     fp.close()
-def _File(filename, zipfile=None):
+def _File(filename, zipfile=None, parent=None):
     ''' Assess file type and return corresponding object.
     '''
     ext = filename.lower().split('.')[-1]
@@ -1873,7 +1897,7 @@ def _File(filename, zipfile=None):
     elif ext == 'txt':
         return TxtFile(filename, zipfile=zipfile)
     elif ext == 'm':
-        return MATLABFile(filename, zipfile=zipfile)
+        return MATLABFile(filename, zipfile=zipfile, parent=parent)
     elif ext == 'c':
         return CFile(filename, zipfile=zipfile)
     elif ext == 'md':
