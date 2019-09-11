@@ -224,3 +224,11 @@ def get_stmts(extended=False):
     stmts = list(set(STMTS2+EQSTMTS2)) if not extended else list(set(STMTS1+STMTS2+EQSTMTS1+EQSTMTS2))
     return [(stmt, re.compile(r'\W*{:s}\W'.format(stmt)), re.compile(r'{:s}\s*='.format(stmt))) for stmt in stmts]
         
+def get_specials():
+    specials = ['anon_at','ampersand']
+    return [(spec, spec, spec) for spec in specials]
+        
+def get_reserved():
+    reserved = ['for','if','else','false','true']
+    return [(res, re.compile(r'\W{:s}\W'.format(res)), re.compile(r'{:s}\s*='.format(res))) for res in reserved]
+        

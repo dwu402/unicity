@@ -2,6 +2,8 @@ import os,sys
 sys.path.insert(0, os.path.abspath('..'))
 from unicity import Project, Comparison 
 
+import cProfile, pstats
+
 def similarity_check():
     # load a Project
     proj = Project('example_project.zip', expecting=['functions.py'])
@@ -51,12 +53,14 @@ def save_and_load_comparisons():
 
 def similarity_check_matlab():
     # load Project
-    proj = Project(r'D:\code\unicity_tests\submissions_matlab', expecting=['improved_euler_solve.m'])
-    #proj
+    cProfile.run("Project('C:/Users/ddem014/Downloads/331 Lab 1 2019/processed_small', expecting=['all.m'])", 'restats')
+    p = pstats.Stats('restats')
+    p.sort_stats('time').print_stats(15)
+    
     # run similarity check
-    comp = proj.compare('improved_euler_solve.m')
+    #comp = proj.compare('all.m')
     # plot similarity check
-    proj.similarity_report(comp)
+    #proj.similarity_report(comp)
 
 if __name__ == "__main__":
     #similarity_check()

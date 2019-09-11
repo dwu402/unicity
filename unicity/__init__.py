@@ -14,7 +14,7 @@ from scipy.spatial.distance import squareform
 from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
-from unicity.mrtns import get_fns, get_stmts
+from unicity.mrtns import get_fns, get_stmts, get_specials, get_reserved
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # silent warning on fuzzywuzzy import
@@ -211,27 +211,32 @@ class Comparison(object):
         D = D[:,idx2]
         im = axmatrix.matshow(D, aspect='auto', origin='lower', cmap=plt.cm.YlGnBu, vmin=0, vmax=1.)
         # plot all similarities
-        bins = np.linspace(0,1,max([int(np.sqrt(len(Ds))/2),2]))
-        h,e = np.histogram(Ds, bins = bins)
+        Dsf = [d for d in Ds if d <= 1.]
+        bins = np.linspace(0,1,max([int(np.sqrt(len(Dsf))/2),2]))
+        h,e = np.histogram(Dsf, bins = bins)
         w = e[1]-e[0]
         m = 0.5*(e[:-1]+e[1:])
-        h = h/np.sum(h[:-1])/w
-        axbar.bar(m[:-1], h[:-1], w, color = [plt.cm.YlGnBu(i) for i in m], label='full distribution')
+        h = h/np.sum(h)/w
+        axbar.bar(m, h, w, color = [plt.cm.YlGnBu(i) for i in m], label='full distribution')
         axbar.set_xlabel('uniqueness')
         axbar.set_yticks([])
         # plot minimum similarities
-        h,e = np.histogram(Dmin, bins = bins)
+        Dminf = [d for d in Dmin if d <= 1.]
+        h,e = np.histogram(Dminf, bins = bins)
         h = h*n/2.
         w = e[1]-e[0]
         m = 0.5*(e[:-1]+e[1:])
-        h = h/np.sum(h[:-1])/w
-        axbar.bar(m[:-1], h[:-1], w, edgecolor = 'k', fc = (0,0,0,0), label='distribution of minimums')
+        h = h/np.sum(h)/w
+
+        axbar.bar(m, h, w, edgecolor = 'k', fc = (0,0,0,0), label='distribution of minimums')
         # find best fit GEV curve
         try:
+            if len(bins) < 2:
+                raise
             pcut = 0.0
             i = np.argmin(abs(m-pcut))
-            scale = np.sum(h[:-1])/np.sum(h[i:-1])
-            p = curve_fit(_gev, m[i:-1], h[i:-1]*scale, [0.,0.1],
+            scale = np.sum(h)/np.sum(h[i:])
+            p = curve_fit(_gev, m[i:], h[i:]*scale, [0.,0.1],
                 bounds = ([0,0],[np.inf,np.inf]))[0]
             x1 = np.linspace(0,1,101)
             axbar.plot(x1, _gev(x1, *p), 'r:', label='best-fit Weibull')
@@ -423,10 +428,13 @@ class Project(object):
         extended = False
         self._mrtns_fns = get_fns(extended)
         self._mrtns_stmts = get_stmts(extended)
+        self._mrtns_specials = get_specials()
+        self._mrtns_reserved = get_reserved()
         self._run_test = False
         frame = inspect.stack()[1]
         module = inspect.getmodule(frame[0])
-        self._parent_script = module.__file__
+        if module is not None:
+            self._parent_script = module.__file__
         self.clientlist = []
         self.client = {}
         self.portfolio_status = {'complete':[],'partial':[],'absent':[]}
@@ -1713,17 +1721,62 @@ class MATLABFile(BaseFile):
     def __init__(self, filename, zipfile, parent):
         super(MATLABFile,self).__init__(filename, zipfile, parent)
         self._tree = None
-        self._parse_file(parent._mrtns_fns, parent._mrtns_stmts)
-    def _parse_file(self, fns, stmts):
+        self._parse_file(parent._mrtns_fns, parent._mrtns_stmts,parent._mrtns_specials, parent._mrtns_reserved)
+    def _parse_file(self, fns, stmts, specials, reserved):
+        ''' Parse MATLAB file for function definition info.
+        '''
+        self._parse_file_bkp(fns, stmts, specials, reserved)
+        return
+        extended = False
+        
+        # assemble check lists, exclusions lists and methods
+            # lists for checking
+        lists = [list(enumerate(ls)) for ls in [fns, reserved, stmts, specials]]
+            # indices to check
+        inds = [list(np.arange(len(ls))) for ls in lists]
+            # method to run
+        methods = [self._count_, self._count_, self._count_, self._count_special]
+
+        self.all_keywords = []
+
+        # parse line by line using regex
+        self.lns = []
+
+        for fn in fns:
+            fn[0] = 'ceil'
+            re.findall('\n\W{:s}\([\n\%]'.format(fn[0]),''.join(self.lns))
+
+        for ln in self.lns:
+            s = 'hold'
+            re.compile('\W{:s}\('.format(s)), re.compile('{:s}\s*='.format(fn)))
+
+            # strip off comments and skip empty lines
+            ln = ln.split('%')[0].strip()
+            if ln == '':
+                continue
+            # remove semi colons WHAT IS THE POINT
+            ln = ln.replace(';','')
+            
+            # loop over statement lists and counting methods
+            for lst, meth, ind in zip(lists, methods,inds):
+                rem = []
+                for i,ls in [lst[i] for i in ind]:
+                    # check if statement name overwritten by user
+                    match = re.match(ls[2], ln.replace(' ','').replace('\t',''))
+                    if match:
+                        rem.append(i)
+                        continue
+                    # count statement frequency
+                    counts = meth(ls[1], ln)
+                    for i in range(counts):
+                        self.all_keywords.append(ls[0])
+                # remove user overwritten statements from future checks
+                for i in rem[::-1]: 
+                    ind.remove(i)
+    def _parse_file_bkp(self, fns, stmts, specials, reserved):
         ''' Parse MATLAB file for function definition info.
         '''
         extended = False
-        
-        specials = ['anon_at','ampersand']
-        specials = [(spec, spec, spec) for spec in specials]
-        
-        reserved = ['for','if','else','false','true']
-        reserved = [(res, re.compile(r'\W{:s}\W'.format(res)), re.compile(r'{:s}\s*='.format(res))) for res in reserved]
         
         # assemble check lists, exclusions lists and methods
             # lists for checking
