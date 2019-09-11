@@ -216,19 +216,14 @@ EQSTMTS2 = [
     'uitabgroup','actxcontrollist','runperf','clock','mrdivide','ismac','now','colorcube','uicheckbox','localfunctions',
     'rticklabels','rdivide','cool','griddedInterpolant','genpath','gcf','rosser','warning','listfonts',]
 
-def get_fns(extended=False):
+def get_regexes(extended=False):
     fns = FNS2 if not extended else FNS1+FNS2
-    return [(fn, re.compile('\W{:s}\('.format(fn)), re.compile('{:s}\s*='.format(fn))) for fn in fns]
-        
-def get_stmts(extended=False):
-    stmts = list(set(STMTS2+EQSTMTS2)) if not extended else list(set(STMTS1+STMTS2+EQSTMTS1+EQSTMTS2))
-    return [(stmt, re.compile(r'\W*{:s}\W'.format(stmt)), re.compile(r'{:s}\s*='.format(stmt))) for stmt in stmts]
-        
-def get_specials():
-    specials = ['anon_at','ampersand']
-    return [(spec, spec, spec) for spec in specials]
-        
-def get_reserved():
     reserved = ['for','if','else','false','true']
-    return [(res, re.compile(r'\W{:s}\W'.format(res)), re.compile(r'{:s}\s*='.format(res))) for res in reserved]
-        
+    stmts = list(set(STMTS2+EQSTMTS2+reserved)) if not extended else list(set(STMTS1+STMTS2+EQSTMTS1+EQSTMTS2+reserved))
+    lst = [(fn, re.compile(r'\W{:s}\('.format(fn)), re.compile(r'{:s}\s*='.format(fn))) for fn in fns]
+    lst += [(stmt, re.compile(r'\W{:s}\W'.format(stmt)), re.compile(r'{:s}\s*='.format(stmt))) for stmt in stmts]
+    specials = ['anon_at','ampersand']
+    symbols = ['@','&']
+    
+    return lst + [(spec, re.compile(r'{:s}'.format(symb)), None) for spec,symb in zip(specials, symbols)]
+                

@@ -14,7 +14,7 @@ from scipy.spatial.distance import squareform
 from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
-from unicity.mrtns import get_fns, get_stmts, get_specials, get_reserved
+from unicity.mrtns import get_regexes
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # silent warning on fuzzywuzzy import
@@ -424,12 +424,10 @@ class Project(object):
         self._parse_filepath()
         self._expecting = expecting
         self._ignore_files = ignore
-        # get compiled regexes, first is keyword match sequence, second is keyword overwrite sequence
+        # get compiled regexes
         extended = False
-        self._mrtns_fns = get_fns(extended)
-        self._mrtns_stmts = get_stmts(extended)
-        self._mrtns_specials = get_specials()
-        self._mrtns_reserved = get_reserved()
+        self._mrtns_regexes = get_regexes(extended)
+        self._mrtns_sub = re.compile('%.*?\n')
         self._run_test = False
         frame = inspect.stack()[1]
         module = inspect.getmodule(frame[0])
@@ -529,7 +527,7 @@ class Project(object):
                                 client.files[fl0] = _File(fl2, zf2, self)
                                 client.files[fl0]._fuzzy_match = max(ratios)
                         else:
-                            client.files.update({fl0:_File(fl2, z2f, self)})            # save file information
+                            client.files.update({fl0:_File(fl2, zf2, self)})            # save file information
                             client.files[fl0]._fuzzy_match = max(ratios)
 
             # check if ignorable
@@ -876,6 +874,35 @@ class Project(object):
             fp.write('    pass\n')
         fp.close()
     # similarity methods
+    def _new_fl(self, matches, routine):
+        # confirm matches only one type
+        exts = list(set([match.split('.')[-1] for match in matches]))
+        if len(exts)>1:
+            raise ValueError("Wildcard \'{:s}\' matches more than one file type.".format(routine))
+        if exts[0] == 'py':
+            File = PythonFile
+        elif exts[0] == 'm':
+            File = MATLABFile
+        else:
+            raise ValueError("Wildcard matching not available for file type \'.{:s}\'".format(exts[0]))
+            
+        for cl in self.clientlist:
+            # create new "file" that concatenates all wildcard matches
+            cl.files.update({routine:File(None, None)})
+            self._expecting.append(routine)
+            # copy data from matched files across
+            fls = cl.files.keys()
+            for match in matches:
+                if match not in fls:
+                    continue
+                if type(cl.files[match]) is PythonFile:
+                    if cl.files[match]._tree == -1:
+                        continue
+                    for k,v in cl.files[match].reserved.items():
+                        cl.files[routine].reserved[k] += v
+                    cl.files[routine].all_calls += cl.files[match].all_calls
+                elif type(cl.files[match]) is MATLABFile:
+                    cl.files[routine].all_keywords += cl.files[match].all_keywords    
     def similarity_report(self, comparison, client = None, save = None):
         ''' Creates a summary of similarity metrics.
 
@@ -991,6 +1018,13 @@ class Project(object):
         assert not (prior_routine is not None and prior_project is None), "must pass prior_project if you're going to pass prior_routine"
         if prior_routine is None:
             prior_routine = routine        
+
+        # check if wildcard used, in which case new file objects may need to be generated
+        matches = [fl for fl in self._expecting if fnmatch(fl, routine)]
+        if len(matches)>1:
+            routine = routine.replace('*','_')
+            prior_routine = routine
+            self._new_fl(matches, routine)
 
         # load template file
         if template is not None:
@@ -1144,6 +1178,8 @@ class Project(object):
         self._tsfile = self._parent_script
         assert client is None or client in self.client.keys(), 'no such client \'{}\''.format(client)
         assert not (ncpus > 1 and timeout is not None), 'timeout only implemented for serial (ncpus=1)'
+        if callable(routine):
+            raise ValueError("'routine' argument must be function NAME not function HANDLE, e.g., '{:s}'".format(routine.__name__))
 
         self.__getattribute__('_test_{:s}'.format(language))(routine, ncpus, client, timeout, **kwargs)
         self._run_test = True
@@ -1284,9 +1320,17 @@ class _FunctionVisitor(ast.NodeVisitor):
             self.all_calls.append(node.func.id)
             self.all_keywords.append(node.func.id)
         except AttributeError:
-            self.methods.append(node.func.attr)
-            self.all_calls.append(node.func.attr)
-            self.all_keywords.append(node.func.attr)
+            try:
+                self.methods.append(node.func.attr)
+                self.all_calls.append(node.func.attr)
+                self.all_keywords.append(node.func.attr)
+            except AttributeError:
+                try:
+                    self.methods.append(node.func.func.attr)
+                    self.all_calls.append(node.func.func.attr)
+                    self.all_keywords.append(node.func.func.attr)
+                except:
+                    pass
         self.generic_visit(node)
     def visit_For(self,node):
         ''' Save use of For loop.
@@ -1506,7 +1550,7 @@ class ClassInfo(object):
 class BaseFile(object):
     ''' Class for generic file.
     '''
-    def __init__(self, filename, projzip, parent):
+    def __init__(self, filename, projzip):
         self.filename = filename
         self._projzip = projzip
         if filename is not None:
@@ -1586,7 +1630,11 @@ class PythonFile(BaseFile):
     def __init__(self, filename, zipfile):
         super(PythonFile,self).__init__(filename, zipfile)
         self._tree = None
-        self._parse_file()
+        if filename is not None:
+            self._parse_file()
+        else:
+            self.all_calls = []
+            self.reserved = _FunctionVisitor().reserved
     def _parse_file(self):
         ''' Parse Python file for function definition info.
         '''
@@ -1718,101 +1766,33 @@ class MATLABFile(BaseFile):
         -----------
         
     '''
-    def __init__(self, filename, zipfile, parent):
-        super(MATLABFile,self).__init__(filename, zipfile, parent)
+    def __init__(self, filename, zipfile, parent=None):
+        super(MATLABFile,self).__init__(filename, zipfile)
         self._tree = None
-        self._parse_file(parent._mrtns_fns, parent._mrtns_stmts,parent._mrtns_specials, parent._mrtns_reserved)
-    def _parse_file(self, fns, stmts, specials, reserved):
+        if filename is not None:
+            self._parse_file(parent._mrtns_regexes, parent._mrtns_sub)
+        else:
+            self.all_keywords = []
+    def _parse_file(self, regexes, sub):
         ''' Parse MATLAB file for function definition info.
         '''
-        self._parse_file_bkp(fns, stmts, specials, reserved)
-        return
-        extended = False
-        
-        # assemble check lists, exclusions lists and methods
-            # lists for checking
-        lists = [list(enumerate(ls)) for ls in [fns, reserved, stmts, specials]]
-            # indices to check
-        inds = [list(np.arange(len(ls))) for ls in lists]
-            # method to run
-        methods = [self._count_, self._count_, self._count_, self._count_special]
-
         self.all_keywords = []
 
-        # parse line by line using regex
-        self.lns = []
+        # join lines and exclude comments
+        self.lns = re.sub(sub,'',''.join(self.lns))
 
-        for fn in fns:
-            fn[0] = 'ceil'
-            re.findall('\n\W{:s}\([\n\%]'.format(fn[0]),''.join(self.lns))
+        for kw,re_match,re_exclude in regexes:
+            # check for overwrite
+            if re_exclude:
+                match = re.search(re_exclude,self.lns)
+            else:
+                match = None
+            if match:
+                matches = re.findall(re_match, self.lns[:match.regs[0][0]])
+            else:
+                matches = re.findall(re_match, self.lns)
 
-        for ln in self.lns:
-            s = 'hold'
-            re.compile('\W{:s}\('.format(s)), re.compile('{:s}\s*='.format(fn)))
-
-            # strip off comments and skip empty lines
-            ln = ln.split('%')[0].strip()
-            if ln == '':
-                continue
-            # remove semi colons WHAT IS THE POINT
-            ln = ln.replace(';','')
-            
-            # loop over statement lists and counting methods
-            for lst, meth, ind in zip(lists, methods,inds):
-                rem = []
-                for i,ls in [lst[i] for i in ind]:
-                    # check if statement name overwritten by user
-                    match = re.match(ls[2], ln.replace(' ','').replace('\t',''))
-                    if match:
-                        rem.append(i)
-                        continue
-                    # count statement frequency
-                    counts = meth(ls[1], ln)
-                    for i in range(counts):
-                        self.all_keywords.append(ls[0])
-                # remove user overwritten statements from future checks
-                for i in rem[::-1]: 
-                    ind.remove(i)
-    def _parse_file_bkp(self, fns, stmts, specials, reserved):
-        ''' Parse MATLAB file for function definition info.
-        '''
-        extended = False
-        
-        # assemble check lists, exclusions lists and methods
-            # lists for checking
-        lists = [list(enumerate(ls)) for ls in [fns, reserved, stmts, specials]]
-            # indices to check
-        inds = [list(np.arange(len(ls))) for ls in lists]
-            # method to run
-        methods = [self._count_, self._count_, self._count_, self._count_special]
-
-        self.all_keywords = []
-
-        # parse line by line using regex
-        for ln in self.lns:
-            # strip off comments and skip empty lines
-            ln = ln.split('%')[0].strip()
-            if ln == '':
-                continue
-            # remove semi colons WHAT IS THE POINT
-            ln = ln.replace(';','')
-            
-            # loop over statement lists and counting methods
-            for lst, meth, ind in zip(lists, methods,inds):
-                rem = []
-                for i,ls in [lst[i] for i in ind]:
-                    # check if statement name overwritten by user
-                    match = re.match(ls[2], ln.replace(' ','').replace('\t',''))
-                    if match:
-                        rem.append(i)
-                        continue
-                    # count statement frequency
-                    counts = meth(ls[1], ln)
-                    for i in range(counts):
-                        self.all_keywords.append(ls[0])
-                # remove user overwritten statements from future checks
-                for i in rem[::-1]: 
-                    ind.remove(i)
+            self.all_keywords += len(matches)*[kw]
     def _count_special(self, special, ln):
         return self.__getattribute__('_count_{:s}'.format(special))(ln)   
     def _count_anon_at(self, ln):

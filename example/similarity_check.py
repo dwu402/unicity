@@ -52,15 +52,16 @@ def save_and_load_comparisons():
     proj.similarity_report(comp_loaded)
 
 def similarity_check_matlab():
-    # load Project
-    cProfile.run("Project('C:/Users/ddem014/Downloads/331 Lab 1 2019/processed_small', expecting=['all.m'])", 'restats')
-    p = pstats.Stats('restats')
-    p.sort_stats('time').print_stats(15)
+    # load MATLAB Project
+    mfls = ['brent','bisection','combined','golden','laguerre','newton','newtonmultivar','regularafalsi','secant']
+    mfls = [mfl+'.m' for mfl in mfls]
+    proj = Project('C:/Users/ddem014/Downloads/331 Lab 1 2019.zip', expecting=mfls)
     
-    # run similarity check
-    #comp = proj.compare('all.m')
+    # run similarity check using wildcard to select multiple files
+    comp = proj.compare('*.m')
     # plot similarity check
-    #proj.similarity_report(comp)
+    proj.similarity_report(comp)
+
 
 if __name__ == "__main__":
     #similarity_check()
