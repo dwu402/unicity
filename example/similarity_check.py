@@ -2,8 +2,6 @@ import os,sys
 sys.path.insert(0, os.path.abspath('..'))
 from unicity import Project, Comparison 
 
-import cProfile, pstats
-
 def similarity_check():
     # load a Project
     proj = Project('example_project.zip', expecting=['functions.py'])
@@ -55,10 +53,29 @@ def similarity_check_matlab():
     # load MATLAB Project
     mfls = ['brent','bisection','combined','golden','laguerre','newton','newtonmultivar','regularafalsi','secant']
     mfls = [mfl+'.m' for mfl in mfls]
-    proj = Project('C:/Users/ddem014/Downloads/331 Lab 1 2019.zip', expecting=mfls)
+    #proj = Project('example_project_matlab.zip', expecting=mfls)
     
-    # run similarity check using wildcard to select multiple files
-    comp = proj.compare('*.m')
+    # run similarity check on file
+    #comp = proj.compare('combined.m', template = 'matlab_template.zip')
+
+    
+    proj = Project(r'C:\Users\ddem014\Downloads\331 Lab 1 2019.zip', expecting=mfls)
+    
+    # run similarity check on file
+    comp = proj.compare('*.m')#, template = 'matlab_template.zip')
+    
+    # plot similarity check
+    proj.similarity_report(comp)
+
+def similarity_check_wildcard():
+    # load MATLAB Project
+    mfls = ['brent','bisection','combined','golden','laguerre','newton','newtonmultivar','regularafalsi','secant']
+    mfls = [mfl+'.m' for mfl in mfls]
+    proj = Project('example_project_matlab.zip', expecting=mfls)
+    
+    # run similarity check using WILDCARD to concatenate multiple files
+    comp = proj.compare('*i*.m')
+    
     # plot similarity check
     proj.similarity_report(comp)
 
@@ -75,3 +92,7 @@ if __name__ == "__main__":
     #save_and_load_comparisons()
 
     similarity_check_matlab()
+
+    #similarity_check_wildcard()
+
+    

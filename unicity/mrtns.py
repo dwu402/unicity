@@ -163,7 +163,7 @@ FNS2 = [
     'regexprep','unix','str2double','ftell','feof','save','listModifiedFiles','removeParameter','null','datastore',
     'unmkpp','clearPersonalValue','mkpp','addParamValue','addvars','rowfun','fileDatastore','xtickformat',
     'celldisp','addpath','isweekend','line','runInParallel','edges','extractBetween','mustBeNegative','urlread',
-    'usejava','validateattributes','listfonts',]
+    'usejava','validateattributes','listfonts','zeros']
 STMTS1 = [
     'matlab.apputil.create','matlab.apputil.getInstalledAppInfo','matlab.engine.shareEngine','matlab.unittest.plugins.TAPPlugin.producingVersion13',
     'matlab.unittest.plugins.TAPPlugin.producingOriginalFormat','matlab.net.http.HeaderField.displaySubclasses',
@@ -179,7 +179,7 @@ STMTS2 = [
     'uisave','exit','unloadlibrary','ans','polaraxes','type','who','uiopen','help','matlab','whos','diary',
     'clear','clc','fileattrib','copyfile','grid','doc','version','finish','profile','restoredefaultpath',
     'varargout','snapnow','seriallist','mkdir','dbquit','varargin','movefile','clearvars','xlim','upgradePreviouslyInstalledSupportPackages',
-    'beep','clearAllMemoizedCaches','movegui','open','NaT','legend','timezones','edit','cd','pathtool','delete',
+    'beep','clearAllMemoizedCaches','movegui','open','NaT','legend','edit','cd','pathtool','delete',
     'batchStartupOptionUsed','dbstack','exportsetupdlg','helpdlg','demo','uisetfont','persistent','orient',
     'docsearch','nargout','opengl','continue','echodemo','license','save','libfunctions','figure',
     'daspect','javaclasspath','regmatlabserver','warning','drawnow','what','winopen','rehash','libfunctionsview',
@@ -203,7 +203,7 @@ EQSTMTS2 = [
     'prism','ginput','mislocked','namelengthmax','mldivide','digraph','pbaspect','filemarker','copper','gcmr',
     'uiimage','uitable','Inf','rlim','uislider','gettsbetweenevents','autumn','newline','plus','libpointer',
     'errordlg','uigetfile','uiradiobutton','thetaticklabels','rulerPanInteraction','uigauge','struct','bone',
-    'axis','dialog','uifigure','uitreenode','isunix','uicontrol','geolimits','randn','ones','rotateInteraction',
+    'axis','dialog','uifigure','uitreenode','isunix','uicontrol','geolimits','randn','rotateInteraction',
     'timerfindall','uispinner','computer','table','date','version','ispc','caxis','uilamp','ne','winter',
     'recycle','mexhost','uipanel','uitab','getframe','spreadsheetImportOptions','gray','j','uisetcolor','uiknob',
     'uidatepicker','gca','xlim','uiaxes','uilabel','uibuttongroup','beep','uieditfield','mtimes','settings',
@@ -215,15 +215,37 @@ EQSTMTS2 = [
     'uitree','audiorecorder','getabstime','weboptions','uiputfile','function','xtickformat','datetime','parula',
     'uitabgroup','actxcontrollist','runperf','clock','mrdivide','ismac','now','colorcube','uicheckbox','localfunctions',
     'rticklabels','rdivide','cool','griddedInterpolant','genpath','gcf','rosser','warning','listfonts',]
-
+'''
+    duplicates of ones and timezones
+    ylabel
+    ylim
+    yline
+    ymd
+    ytickangle
+    ytickformat
+    yticklabels
+    yticks
+    yyaxis
+    yyyymmdd
+    zeros
+    zip
+    zlabel
+    zlim
+    zoom
+    zoomInteraction
+    ztickangle
+    ztickformat
+    zticklabels
+    zticks
+'''
 def get_regexes(extended=False):
     fns = FNS2 if not extended else FNS1+FNS2
-    reserved = ['for','if','else','false','true']
+    reserved = ['for','if','else','false','true','while']
     stmts = list(set(STMTS2+EQSTMTS2+reserved)) if not extended else list(set(STMTS1+STMTS2+EQSTMTS1+EQSTMTS2+reserved))
-    lst = [(fn, re.compile(r'\W{:s}\('.format(fn)), re.compile(r'{:s}\s*='.format(fn))) for fn in fns]
+    lst = [(fn+'()', re.compile(r'\W{:s}\('.format(fn)), re.compile(r'{:s}\s*='.format(fn))) for fn in fns]
     lst += [(stmt, re.compile(r'\W{:s}\W'.format(stmt)), re.compile(r'{:s}\s*='.format(stmt))) for stmt in stmts]
-    specials = ['anon_at','ampersand']
-    symbols = ['@','&']
+    specials = ['anon_at','ampersand','<','>','|','~']
+    symbols = ['@','&','\<','\>','\|','~']
     
     return lst + [(spec, re.compile(r'{:s}'.format(symb)), None) for spec,symb in zip(specials, symbols)]
                 

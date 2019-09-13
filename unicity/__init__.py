@@ -1,4 +1,4 @@
-import os, ast, zipfile, sys, traceback, re, glob, inspect, warnings
+import os, ast, zipfile, sys, traceback, re, glob, inspect, warnings, shutil
 import numpy as np
 from itertools import starmap
 from functools import partial
@@ -9,7 +9,6 @@ from multiprocessing import Pool, Process, Manager
 from matplotlib import pyplot as plt
 import scipy.cluster.hierarchy as sch
 from scipy.optimize import curve_fit
-from scipy.stats import genextreme
 from scipy.spatial.distance import squareform
 from PIL import Image
 from fnmatch import fnmatch
@@ -1029,9 +1028,30 @@ class Project(object):
         # load template file
         if template is not None:
             assert os.path.isfile(template), 'cannot find template file {:s}'.format(template)
-            template = PythonFile(template, zipfile=None)
-            if template._tree == -1:
-                raise UnicityError("Cannot perform compare due to syntax errors in \'{:s}\' - see below:\n\n{:s}".format(template.filename, template._tree_err))
+            
+            ext = template.split('.')[-1]
+            if ext == 'zip':
+                # open temporary zipfile, save and load
+                try:
+                    tmpfl = '_{:d}.zip'.format(np.random.randint(999999))
+                    tmpzip = 'template_'+template.split(os.sep)[-1]
+                    shutil.copyfile(template,tmpzip)
+                    with zipfile.ZipFile(tmpfl, 'w') as zf:
+                        zf.write(tmpzip)
+                    temp_proj = Project(tmpfl, expecting=self._expecting)
+                finally:
+                    # delete temporary zipfiles
+                    os.remove(tmpfl)
+                    os.remove(tmpzip)
+                if len(matches)>1:
+                    temp_proj._new_fl(matches, routine)
+                template = temp_proj.client['template'].files[routine]
+            elif ext == 'py':
+                template = PythonFile(template, zipfile=None)
+                if template._tree == -1:
+                    raise UnicityError("Cannot perform compare due to syntax errors in \'{:s}\' - see below:\n\n{:s}".format(template.filename, template._tree_err))
+            elif ext == 'm':
+                template = MATLABFile(template, zipfile=None)
 
         # preparation for prior project
         if prior_project is not None:
@@ -1787,12 +1807,15 @@ class MATLABFile(BaseFile):
                 match = re.search(re_exclude,self.lns)
             else:
                 match = None
+            # find location of matches
             if match:
-                matches = re.findall(re_match, self.lns[:match.regs[0][0]])
+                matches = re_match.finditer(self.lns[:match.regs[0][0]])
             else:
-                matches = re.findall(re_match, self.lns)
+                matches = re_match.finditer(self.lns)
 
-            self.all_keywords += len(matches)*[kw]
+            self.all_keywords += [(m.start(), kw) for m in matches]
+        # order matches by location in file
+        self.all_keywords = [kw for i,kw in sorted(self.all_keywords, key = lambda x: x[0])]
     def _count_special(self, special, ln):
         return self.__getattribute__('_count_{:s}'.format(special))(ln)   
     def _count_anon_at(self, ln):
