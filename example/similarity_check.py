@@ -53,17 +53,11 @@ def similarity_check_matlab():
     # load MATLAB Project
     mfls = ['brent','bisection','combined','golden','laguerre','newton','newtonmultivar','regularafalsi','secant']
     mfls = [mfl+'.m' for mfl in mfls]
-    #proj = Project('example_project_matlab.zip', expecting=mfls)
+    proj = Project('example_project_matlab.zip', expecting=mfls)
     
     # run similarity check on file
-    #comp = proj.compare('combined.m', template = 'matlab_template.zip')
+    comp = proj.compare('combined.m', template = 'matlab_template.zip')
 
-    
-    proj = Project(r'C:\Users\ddem014\Downloads\331 Lab 1 2019.zip', expecting=mfls)
-    
-    # run similarity check on file
-    comp = proj.compare('*.m')#, template = 'matlab_template.zip')
-    
     # plot similarity check
     proj.similarity_report(comp)
 
@@ -81,7 +75,7 @@ def similarity_check_wildcard():
 
 
 if __name__ == "__main__":
-    #similarity_check()
+    similarity_check()
     
     #similarity_check_with_template()
 
@@ -91,7 +85,7 @@ if __name__ == "__main__":
 
     #save_and_load_comparisons()
 
-    similarity_check_matlab()
+    #similarity_check_matlab()
 
     #similarity_check_wildcard()
 

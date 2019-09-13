@@ -163,7 +163,9 @@ FNS2 = [
     'regexprep','unix','str2double','ftell','feof','save','listModifiedFiles','removeParameter','null','datastore',
     'unmkpp','clearPersonalValue','mkpp','addParamValue','addvars','rowfun','fileDatastore','xtickformat',
     'celldisp','addpath','isweekend','line','runInParallel','edges','extractBetween','mustBeNegative','urlread',
-    'usejava','validateattributes','listfonts','zeros']
+    'usejava','validateattributes','listfonts','ylabel','ylim','yline','ymd','ytickangle','ytickformat','yticklabels',
+    'yticks','yyaxis','yyyymmdd','zeros','zip','zlabel','zlim','zoom','zoomInteraction','ztickangle','ztickformat',
+    'zticklabels','zticks']
 STMTS1 = [
     'matlab.apputil.create','matlab.apputil.getInstalledAppInfo','matlab.engine.shareEngine','matlab.unittest.plugins.TAPPlugin.producingVersion13',
     'matlab.unittest.plugins.TAPPlugin.producingOriginalFormat','matlab.net.http.HeaderField.displaySubclasses',
@@ -176,14 +178,16 @@ STMTS2 = [
     'odeset','codeCompatibilityReport','munlock','pyversion','dbtype','groot','import','validateFunctionSignaturesJSON',
     'lookfor','ver','dbstop','appdesigner','methods','mex','break','global','box','keyboard','quit','guide',
     'pbaspect','home','hold','mlock','preferences','format','axes','grabcode','matlabrc','pause','cla','ls',
-    'uisave','exit','unloadlibrary','ans','polaraxes','type','who','uiopen','help','matlab','whos','diary',
+    'uisave','exit','unloadlibrary','ans','polaraxes','type','who','ones','timezones','uiopen','help','matlab','whos','diary',
     'clear','clc','fileattrib','copyfile','grid','doc','version','finish','profile','restoredefaultpath',
     'varargout','snapnow','seriallist','mkdir','dbquit','varargin','movefile','clearvars','xlim','upgradePreviouslyInstalledSupportPackages',
     'beep','clearAllMemoizedCaches','movegui','open','NaT','legend','edit','cd','pathtool','delete',
     'batchStartupOptionUsed','dbstack','exportsetupdlg','helpdlg','demo','uisetfont','persistent','orient',
     'docsearch','nargout','opengl','continue','echodemo','license','save','libfunctions','figure',
     'daspect','javaclasspath','regmatlabserver','warning','drawnow','what','winopen','rehash','libfunctionsview',
-    'load','mapreducer','line','print','dbstep','dbclear','savepath','return','dbmex','userpath',]
+    'load','mapreducer','line','print','dbstep','dbclear','savepath','return','dbmex','userpath','ylim','ytickangle',
+    'ytickformat','yticklabels','yticks','yyaxis','zeros','zoom','zoomInteraction','ztickangle','ztickformat',
+    'zticklabels','zticks',]
 EQSTMTS1 = [
     'containers.Map','matlab.addons.installedAddons','matlab.engine.isEngineShared','matlab.apputil.getInstalledAppInfo',
     'matlab.engine.engineName','matlab.addons.toolbox.installedToolboxes','matlab.net.base64decode','matlab.net.base64encode',
@@ -215,29 +219,7 @@ EQSTMTS2 = [
     'uitree','audiorecorder','getabstime','weboptions','uiputfile','function','xtickformat','datetime','parula',
     'uitabgroup','actxcontrollist','runperf','clock','mrdivide','ismac','now','colorcube','uicheckbox','localfunctions',
     'rticklabels','rdivide','cool','griddedInterpolant','genpath','gcf','rosser','warning','listfonts',]
-'''
-    duplicates of ones and timezones
-    ylabel
-    ylim
-    yline
-    ymd
-    ytickangle
-    ytickformat
-    yticklabels
-    yticks
-    yyaxis
-    yyyymmdd
-    zeros
-    zip
-    zlabel
-    zlim
-    zoom
-    zoomInteraction
-    ztickangle
-    ztickformat
-    zticklabels
-    zticks
-'''
+
 def get_regexes(extended=False):
     fns = FNS2 if not extended else FNS1+FNS2
     reserved = ['for','if','else','false','true','while']
@@ -246,6 +228,5 @@ def get_regexes(extended=False):
     lst += [(stmt, re.compile(r'\W{:s}\W'.format(stmt)), re.compile(r'{:s}\s*='.format(stmt))) for stmt in stmts]
     specials = ['anon_at','ampersand','<','>','|','~']
     symbols = ['@','&','\<','\>','\|','~']
-    
     return lst + [(spec, re.compile(r'{:s}'.format(symb)), None) for spec,symb in zip(specials, symbols)]
                 
