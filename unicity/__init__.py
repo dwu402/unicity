@@ -421,7 +421,9 @@ class Project(object):
         else:
             self._cohort = None
         self._parse_filepath()
-        self._expecting = expecting
+        self._expecting = expecting if type(expecting) is not str else [expecting,]
+        #if type(expecting) is str:
+        #    self._expecting = [expecting,]
         self._ignore_files = ignore
         # get compiled regexes
         extended = False
