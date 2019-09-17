@@ -35,6 +35,14 @@ def similarity_check_jaro():
     comp = proj.compare('functions.py', metric='jaro', template = 'functions_template.py')
     # plot similarity check
     proj.similarity_report(comp)
+    
+def similarity_check_moss():
+    # load a Project
+    proj = Project('example_project.zip', expecting=['functions.py'])
+    # run similarity check using MOSS plagiarism algorithm
+    comp = proj.compare('functions.py', metric='moss', template = 'functions_template.py')
+    # plot similarity check
+    proj.similarity_report(comp)
 
 def save_and_load_comparisons():
     # load Projects
@@ -56,7 +64,7 @@ def similarity_check_matlab():
     proj = Project('example_project_matlab.zip', expecting=mfls)
     
     # run similarity check on file
-    comp = proj.compare('combined.m', template = 'matlab_template.zip')
+    comp = proj.compare('combined.m', metric = 'moss', template = 'matlab_template.zip')
 
     # plot similarity check
     proj.similarity_report(comp)
@@ -73,7 +81,6 @@ def similarity_check_wildcard():
     # plot similarity check
     proj.similarity_report(comp)
 
-
 if __name__ == "__main__":
     similarity_check()
     
@@ -82,6 +89,8 @@ if __name__ == "__main__":
     #similarity_check_prior_project()
     
     #similarity_check_jaro()
+    
+    #similarity_check_moss()
 
     #save_and_load_comparisons()
 

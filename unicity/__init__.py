@@ -14,6 +14,7 @@ from PIL import Image
 from fnmatch import fnmatch
 from difflib import SequenceMatcher
 from unicity.mrtns import get_regexes
+from unicity.winnowing import winnow_distance, hash
 Image.MAX_IMAGE_PIXELS = 1000000000
 
 # silent warning on fuzzywuzzy import
@@ -219,6 +220,9 @@ class Comparison(object):
         axbar.bar(m, h, w, color = [plt.cm.YlGnBu(i) for i in m], label='full distribution')
         axbar.set_xlabel('uniqueness')
         axbar.set_yticks([])
+        hmax = 0.
+        if len(h) > 1:
+            hmax = np.max(h[:-1])
         # plot minimum similarities
         Dminf = [d for d in Dmin if d <= 1.]
         h,e = np.histogram(Dminf, bins = bins)
@@ -242,6 +246,11 @@ class Comparison(object):
         except:
             axbar.plot([], [], 'r:', label='Weibull fitting failed')
             pass
+        
+        if len(h) > 1:
+            hmax = 1.05*np.max([hmax, np.max(h[:-1])])
+            if hmax > 0.:
+                axbar.set_ylim([0, hmax])
 
         gridlines = 20
         dn = int(n/gridlines)
@@ -2062,7 +2071,20 @@ def _jaro(s, t):
             (matches / t_len) +
             ((matches - transpositions / 2) / matches)) / 3
 def _compare_jaro(file1, file2, template, name1, name2):
-    ''' Compute similarity of two Python callable sets based on Jaro distance.
+    return _compare_func(file1, file2, template, name1, name2, _jaro)
+def _moss(s, t):
+    '''MOSS winnow similarity between two submissions.
+    
+        Implementation from https://github.com/agranya99
+    '''
+    # convert keyword names to hashes before passing to winnow
+    s = [['{:05d}'.format(hash(si)),i*5] for i,si in enumerate(s)]
+    t = [['{:05d}'.format(hash(ti)),i*5] for i,ti in enumerate(t)]
+    return winnow_distance(s, t)
+def _compare_moss(file1, file2, template, name1, name2):
+    return _compare_func(file1, file2, template, name1, name2, _moss)
+def _compare_func(file1, file2, template, name1, name2, func):
+    ''' Compute similarity of two Python callable sets based on func.
 
         Parameters:
         -----------
@@ -2093,7 +2115,7 @@ def _compare_jaro(file1, file2, template, name1, name2):
         all_keywords1 = file1.functions[name1].all_keywords
         all_keywords2 = file2.functions[name2].all_keywords
         if template is not None:
-            all_keywords0 = template.functions[name1].all_keywords
+            all_keywords0 = template.functions[name1].all_keywords if name1 in template.functions.keys() else []
         
     # remove template content if given
     if template is not None:
@@ -2108,7 +2130,7 @@ def _compare_jaro(file1, file2, template, name1, name2):
                 pass
 
     # compute similarity
-    similar = _jaro(all_keywords1, all_keywords2)
+    similar = func(all_keywords1, all_keywords2)
     
     return 1.-similar
 def _get_client_code(client, import_froms):
@@ -2165,4 +2187,4 @@ def _compare(file1, file2, name1, name2, template, compare_routine):
 
     return similarity
 
-_builtin_compare_routines = {'command_freq':_compare_command_freq,'jaro':_compare_jaro}
+_builtin_compare_routines = {'command_freq':_compare_command_freq,'jaro':_compare_jaro, 'moss':_compare_moss}

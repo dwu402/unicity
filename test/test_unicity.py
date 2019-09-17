@@ -14,7 +14,11 @@ def test_function():
     assert(statA.id == 'A')							
     assert(statA.val == 2)
 
-def run_one(test):
+def run_one(test, number = None):
+
+    if number is not None:
+        run_one(test[number])
+        return
 
     # unpack
     proj_kwargs, compare_kwargs, report_kwargs, test_kwargs = test[1:]
@@ -22,6 +26,8 @@ def run_one(test):
     # similarity testing
     if test[0] == 1:
         proj = Project('../example/example_project.zip', **proj_kwargs)
+        if compare_kwargs['prior_project'] is not None:
+            compare_kwargs['prior_project'] = Project(compare_kwargs['prior_project'], proj_kwargs['expecting'])
         comp = proj.compare(**compare_kwargs)
         proj.similarity_report(comp, **report_kwargs)
     # unit testing
@@ -31,9 +37,9 @@ def run_one(test):
         
 def assemble_tests():
     proj_kwargs = [
-        ['expecting', ['functions.py','tasks.py']],
+        ['expecting', ['functions.py',['functions.py','tasks.py']]],
         ['ignore', ['*']],
-        ['cohort', [None, 'cohort.txt']], 
+        ['cohort', [None, '../example/cohort.txt']], 
         ['root', [None,'test']],
     ]
     
@@ -41,8 +47,8 @@ def assemble_tests():
         ['routine',['functions.py/Roads.read','functions.py']], 
         ['metric',['command_freq','jaro']], 
         ['ncpus', [1,2]], 
-        ['template', [None,'functions_template.py']], 
-        ['prior_project', [None,'../examples/prior_project.zip']], 
+        ['template', [None,'../example/functions_template.py']], 
+        ['prior_project', [None,'../example/prior_project.zip']], 
     ]
 
     report_kwargs = [
