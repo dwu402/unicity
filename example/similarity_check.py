@@ -1,5 +1,3 @@
-import os,sys
-sys.path.insert(0, os.path.abspath('..'))
 from unicity import Project, Comparison 
 
 def similarity_check():
@@ -73,8 +71,8 @@ def similarity_check_wildcard():
     # load MATLAB Project
     mfls = ['brent','bisection','combined','golden','laguerre','newton','newtonmultivar','regularafalsi','secant']
     mfls = [mfl+'.m' for mfl in mfls]
-    proj = Project('example_project_matlab.zip', expecting=mfls)
-    
+    proj = Project(r'C:\Users\ddem014\Downloads\331 Lab 1 2019.zip', expecting=mfls)
+
     # run similarity check using WILDCARD to concatenate multiple files
     comp = proj.compare('*i*.m')
     
