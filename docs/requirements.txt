@@ -2,4 +2,4 @@ numpy
 scipy
 matplotlib
 fuzzywuzzy
-unicity==0.3
+unicity==0.5
