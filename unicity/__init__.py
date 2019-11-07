@@ -42,11 +42,13 @@ class _Cohort(object):
     def _load(self):
         ''' Load cohort data.
         '''
-        if not os.path.isfile(self.filename):
+        dirname, flname, ext, exists = _path(self.filename)
+        if not exists:
             raise FileNotFoundError('cannot find cohort file at \'{:s}\''.format(self.filename))
         fp = open(self.filename,'r')
         hdrs = fp.readline().rstrip()
         lns = fp.readlines()
+        fp.close()
         lns = [ln.strip() for ln in lns if ln.strip != '']
         hdrs = [hdr.strip() for hdr in hdrs.split(',')]
         if 'name' not in hdrs:
@@ -148,7 +150,7 @@ class Comparison(object):
             self._load(loadfile, prior_project)
     def __repr__(self):
         return 'compare: {:s} by {:s}'.format(self.routine, self.metric)
-    def _plot(self, proj, savefile, client):
+    def _plot(self, proj, savefile, client, top):
         ''' Plot comparison matrix.
 
             Notes
@@ -158,7 +160,7 @@ class Comparison(object):
 
         '''
         # load data
-        D = self.matrix
+        D = copy(self.matrix)
         
         # process distance matrix
         allclientlist = proj.clientlist+self._prior_clientlist
@@ -175,6 +177,26 @@ class Comparison(object):
         Dmin[1:-1] = [np.min([np.min(D[i,:i]), np.min(D[i,i+1:])]) for i in range(1,n-1)]
         Dmin[0] = np.min(D[0,1:])
         Dmin[-1] = np.min(D[-1,:-1])
+
+        # reduce matrix if suggested
+        if top < n:
+            inds = np.array([i for i,D in sorted(enumerate(Dmin), key = lambda x: x[1])[:top]])
+            Dmin = Dmin[inds]
+            D2 = np.zeros((top,top))
+            for i,i0 in enumerate(inds):
+                for j,j0 in enumerate(inds):
+                    D2[i,j] = D[i0,j0]
+            acl = [allclientlist[i] for i in inds]
+            allclientlist = acl
+            D = D2
+            n = top
+
+            k=0; Ds = np.zeros(int((n-1)*n/2))
+            for i in range(n):
+                for j in range(i+1,n):
+                    Ds[k] = D[i,j]
+                    k+=1
+
         condensedD = squareform(D)
         Y1 = sch.linkage(condensedD, method='centroid')
         Y2 = sch.linkage(condensedD, method='single')
@@ -414,13 +436,13 @@ class Project(object):
     '''
     def __init__(self, project, expecting, ignore = ['*'], cohort = None, root = None):
         
-        project = os.path.abspath(project)
-        if os.path.isdir(project):
-            self._projdir = project
-            self._projzip = None
-        elif zipfile.is_zipfile(project):
-            self._projzip = project
+        dirname, flname, ext, exists = _path(project)
+        if zipfile.is_zipfile(project):
+            self._projzip = dirname+os.sep+flname+ext
             self._projdir = None
+        elif exists and not ext:
+            self._projdir = dirname+os.sep+flname+ext
+            self._projzip = None
         else:
             raise ValueError("unrecognized project type \'{:s}\'".format(project))
         
@@ -431,8 +453,6 @@ class Project(object):
             self._cohort = None
         self._parse_filepath()
         self._expecting = expecting if type(expecting) is not str else [expecting,]
-        #if type(expecting) is str:
-        #    self._expecting = [expecting,]
         self._ignore_files = ignore
         # get compiled regexes
         extended = False
@@ -524,8 +544,10 @@ class Project(object):
             elif fl.lower().endswith('.zip'):
                 if self._projdir is not None:
                     zf2 = zipfile.ZipFile(fl)
+                    bio = None
                 else:
-                    zf2 = zipfile.ZipFile(BytesIO(zf.read(fl)))
+                    bio = BytesIO(zf.read(fl))
+                    zf2 = zipfile.ZipFile(bio)
                 fls2 = [fl2.filename for fl2 in zf2.filelist]
                 for fl2 in fls2:
                     ratios = [_check_fuzzy_ratio(fl2, expect) for expect in self._expecting]
@@ -539,11 +561,16 @@ class Project(object):
                         else:
                             client.files.update({fl0:_File(fl2, zf2, self)})            # save file information
                             client.files[fl0]._fuzzy_match = max(ratios)
+                if bio is not None:
+                    bio.close()
+                zf2.close()
 
             # check if ignorable
             else:
                 self._ignore(fl)
 
+        if zf is not None:
+            zf.close()
         # sort clients alphabetically 
         self.clientlist = sorted(self.clientlist, key = lambda x: x.name)
 
@@ -567,32 +594,6 @@ class Project(object):
             self.clientlist.append(cl)
             self.client.update({cl.name:cl})
             return cl
-    def _strip_meta(self, fl):
-        ''' Removes file name decorators and returns base name.
-
-            Parameters:
-            -----------
-            fl : str
-                file name with decorators
-
-            Returns:
-            --------
-            str
-                file name with decorators removed
-
-            Notes:
-            ------
-            Overload this method when for custom application.
-        '''
-        # pull off extension
-        fl = fl.split('.')
-        ext = fl[-1]
-        fl = '.'.join(fl[:-1])
-
-        # remove prepended name and id data
-        fl = fl.split('_')[1]
-
-        return fl + '.' + ext
     def _check_portfolio_status(self):
         ''' Compile portfolio completeness information.
         '''
@@ -896,10 +897,11 @@ class Project(object):
         else:
             raise ValueError("Wildcard matching not available for file type \'.{:s}\'".format(exts[0]))
             
+        self._expecting.append(routine)
         for cl in self.clientlist:
             # create new "file" that concatenates all wildcard matches
             cl.files.update({routine:File(None, None)})
-            self._expecting.append(routine)
+            cl.files[routine].all_keywords = []
             # copy data from matched files across
             fls = cl.files.keys()
             for match in matches:
@@ -912,8 +914,53 @@ class Project(object):
                         cl.files[routine].reserved[k] += v
                     cl.files[routine].all_calls += cl.files[match].all_calls
                 elif type(cl.files[match]) is MATLABFile:
-                    cl.files[routine].all_keywords += cl.files[match].all_keywords    
-    def similarity_report(self, comparison, client = None, save = None):
+                    cl.files[routine].all_keywords += cl.files[match].all_keywords   
+            cl.files[routine]._parsed = True 
+    def _load_template(self, template, fl_matches, routine):
+        # parses various formats of template file
+        if template is None: 
+            return template
+            
+        dirname, flname, ext, exists = _path(template)
+        if not exists:
+            raise FileNotFoundError('cannot find template file {:s}'.format(template))
+            
+        if ext == '.zip':
+            # open temporary zipfile, save and load
+            try:
+                tmpfl = '_{:d}.zip'.format(np.random.randint(999999))
+                tmpzip = 'template_'+template.split(os.sep)[-1]
+                shutil.copyfile(template,tmpzip)
+                with zipfile.ZipFile(tmpfl, 'w') as zf:
+                    zf.write(tmpzip)
+                temp_proj = Project(tmpfl, expecting=self._expecting)
+            finally:
+                # delete temporary zipfiles
+                os.remove(tmpfl)
+                os.remove(tmpzip)
+            if len(fl_matches)>1:
+                temp_proj._new_fl(fl_matches, routine)
+            template = temp_proj.client['template'].files[routine]
+        elif ext == '.py':
+            template = PythonFile(template, zipfile=None)
+            if template._tree == -1:
+                raise UnicityError("Cannot perform compare due to syntax errors in \'{:s}\' - see below:\n\n{:s}".format(template.filename, template._tree_err))
+        elif ext == '.m':
+            template = MATLABFile(template, zipfile=None)
+        template = _parse_file(self._mrtns_regexes, self._mrtns_sub, template)
+        return template
+    def _parse_files(self, fl_matches, prior_clientlist, ncpus):
+        # parse all files in preparation for compare
+        for fl in fl_matches:
+            # get file objects
+            flobjs = [[cl.files[fl],] if fl in cl.files.keys() else [FunctionInfo(_tree=-1),] for cl in self.clientlist + prior_clientlist]
+
+            mapper = starmap if ncpus == 1 else Pool(ncpus).starmap
+            outs = mapper(partial(_parse_file, self._mrtns_regexes, self._mrtns_sub), flobjs)
+            
+            for cl,flobj in zip(self.clientlist + prior_clientlist, outs):
+                cl.files[fl] = flobj
+    def similarity_report(self, comparison, client = None, save = None, top = None):
         ''' Creates a summary of similarity metrics.
 
             Parameters:
@@ -924,6 +971,8 @@ class Project(object):
                 Name of client to highlight or 'anon' for anonymised report.
             save : str (optional)
                 Name of output file (default to {clientname}_{function}.png).
+            top : int (optional)
+                Displays output for TOP most similar clients.
 
         '''
         # interpret input routine
@@ -940,8 +989,14 @@ class Project(object):
         if save is None:
             save = '{:s}similarity_{:s}.png'.format(clientstr, func)
         
+        # 
+        if top is None:
+            top = len(self.clientlist)
+        else:
+            top = min([top, len(self.clientlist)])
+
         # generate plot
-        comparison._plot(self, save, client)
+        comparison._plot(self, save, client, top)
     def compare(self, routine, metric = 'command_freq', ncpus = 1, template = None, 
         prior_project = None, prior_routine = None):
         ''' Compares pairs of portfolios for similarity between implemented Python routine.
@@ -1024,66 +1079,43 @@ class Project(object):
         if not callable(metric):
             assert metric in _builtin_compare_routines, "Unrecognized metric \'{:s}\'".format(metric)
 
-        # check prior routine only specified if prior project given
+        # set up for using prior projects
         assert not (prior_routine is not None and prior_project is None), "must pass prior_project if you're going to pass prior_routine"
-        if prior_routine is None:
-            prior_routine = routine        
+        prior_routine = routine if prior_routine is None else prior_routine    
+        prior_clientlist = [] if prior_project is None else prior_project.clientlist
+
+        # setup serial/parallel job mapper
+        mapper = starmap if ncpus == 1 else Pool(ncpus).starmap
+
+        # parse files for keyword info
+            # file list
+        fl_matches = [fl for fl in self._expecting if fnmatch(fl, routine)]         
+            # files matching unicity specification
+        fl_matches = [self._split_at_delimiter(routine)[0],] if len(fl_matches) == 0 else fl_matches
+            # parse routine
+        self._parse_files(fl_matches, prior_clientlist, ncpus)
 
         # check if wildcard used, in which case new file objects may need to be generated
-        matches = [fl for fl in self._expecting if fnmatch(fl, routine)]
-        if len(matches)>1:
+        if len(fl_matches)>1:
             routine = routine.replace('*','_')
             prior_routine = routine
-            self._new_fl(matches, routine)
+            self._new_fl(fl_matches, routine)
+            if prior_project is not None:
+                prior_project._new_fl(fl_matches, routine)
 
-        # load template file
-        if template is not None:
-            assert os.path.isfile(template), 'cannot find template file {:s}'.format(template)
-            
-            ext = template.split('.')[-1]
-            if ext == 'zip':
-                # open temporary zipfile, save and load
-                try:
-                    tmpfl = '_{:d}.zip'.format(np.random.randint(999999))
-                    tmpzip = 'template_'+template.split(os.sep)[-1]
-                    shutil.copyfile(template,tmpzip)
-                    with zipfile.ZipFile(tmpfl, 'w') as zf:
-                        zf.write(tmpzip)
-                    temp_proj = Project(tmpfl, expecting=self._expecting)
-                finally:
-                    # delete temporary zipfiles
-                    os.remove(tmpfl)
-                    os.remove(tmpzip)
-                if len(matches)>1:
-                    temp_proj._new_fl(matches, routine)
-                template = temp_proj.client['template'].files[routine]
-            elif ext == 'py':
-                template = PythonFile(template, zipfile=None)
-                if template._tree == -1:
-                    raise UnicityError("Cannot perform compare due to syntax errors in \'{:s}\' - see below:\n\n{:s}".format(template.filename, template._tree_err))
-            elif ext == 'm':
-                template = MATLABFile(template, zipfile=None)
-
-        # preparation for prior project
-        if prior_project is not None:
-            prior_clientlist = prior_project.clientlist
-        else:
-            prior_clientlist = []
-
-        # create comparison pairs
+        # load template file if applicable
+        template = self._load_template(template, fl_matches, routine)
+        
+        # create comparison pairs, excluding matches between clients in prior list
         n1 = len(self.clientlist)
         n2 = len(prior_clientlist)
-        # pairs excludes matches between clients in prior list
         pairs = [[[i*1,j*1] for j in range(i+1,n1+n2) if not (i>n1 and j>n1)] for i in range(n1+n2)]
         pairs = list(chain(*pairs))
 
         # empty comparison matrix 
         c = Comparison(None)
         c.matrix = np.zeros((n1+n2,n1+n2))+4.
-        if callable(metric):
-            c.metric = 'user_metric_'+metric.__name__
-        else:
-            c.metric = metric
+        c.metric = 'user_metric_'+metric.__name__ if callable(metric) else metric
         c.routine = routine
         c.prior_routine = prior_routine
 
@@ -1094,26 +1126,6 @@ class Project(object):
         # get routine name
         funcname =  obj + '.' + func if obj is not None else func
         funcname1 =  obj1 + '.' + func1 if obj1 is not None else func1
-
-        for cl in self.clientlist:
-            try:
-                cl.files[fl]
-            except KeyError:
-                # missing file, add a missing tree as a placeholder
-                cl.files.update({fl:FunctionInfo(_tree=-1)})
-
-            # dissociate zipfile for parallel computation
-            cl.files[fl]._projzip = None
-
-        for cl in prior_clientlist:
-            try:
-                cl.files[fl1]
-            except KeyError:
-                # missing file, add a missing tree as a placeholder
-                cl.files.update({fl1:FunctionInfo(_tree=-1)})
-
-            # dissociate zipfile for parallel computation
-            cl.files[fl1]._projzip = None
 
         # jobs to run
         allclientlist = self.clientlist + prior_clientlist
@@ -1126,19 +1138,7 @@ class Project(object):
         pars = zip(fls1,fls2,funcs1,funcs2,fls0)
 
         # run comparisons
-            # choose mapping function: serial vs. parallel
-        if ncpus == 1:
-            mapper = starmap
-        else:
-            p = Pool(ncpus)
-            mapper = p.starmap
-        
-        # run comparisons
-        if callable(metric):
-            compare_routine = metric
-        else:
-            compare_routine = _builtin_compare_routines[metric]
-
+        compare_routine = metric if callable(metric) else _builtin_compare_routines[metric]
         outs = mapper(partial(_compare, compare_routine=compare_routine), pars)
 
         # unpack results
@@ -1158,13 +1158,7 @@ class Project(object):
             c.matrix[i,j] = out
         if not notfile:
             fp.close()
-        # restore zipfile buffers
-        for cl in self.clientlist:
-            try:
-                cl.files[fl]._projzip = zipfile.ZipFile(cl.files[fl]._projzip)
-            except AttributeError:
-                pass
-
+        
         c._prior_clientlist = prior_clientlist
         return c
     # testing methods
@@ -1253,12 +1247,9 @@ class Project(object):
 
         # CONSTRUCT tests
         pars = []
-        if client is None:
-            cls_ = self.clientlist
-        else:
-            cls_ = [self.client[client]]
-        for cl in cls_:
+        cls_ = self.clientlist if client is None else [self.client[client]]        
 
+        for cl in cls_:
             # construct testing code
             clns = _get_client_code(cl, ts.functions[routine].import_froms)
 
@@ -1293,7 +1284,7 @@ class Project(object):
             
             # debug - write test to file with err as docstring
             fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
-            _save_test(fl, err, pars[0])
+            _save_test(fl, err, pars[0], cls_[0])
             return
 
         # PARSE test output
@@ -1306,11 +1297,14 @@ class Project(object):
             return
 
         for err, cl, lns in zip(errs, self.clientlist, pars):
+            # fail file
+            fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
+
             # characterise status
             if type(err) is int:
                 # test suite did not run (various reasons)
                 cl.failed_test_suite = err
-                _save_test(err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine), err, lns, cl)
+                _save_test(fl, err, lns, cl)
                 continue
             elif err == '':
                 # test suite passed - do not modify failure flag, unless not already defined
@@ -1322,8 +1316,6 @@ class Project(object):
             # test suite failed, write function and traceback in docstring
             cl.failed_test_suite = True
 
-            # write fail file
-            fl = err_dir+os.sep+'test_{:s}_{:s}.py'.format(cl.name, routine)
             _save_test(fl, err, lns)
 class _FunctionVisitor(ast.NodeVisitor):
     ''' Class to gather data on Python file.
@@ -1584,6 +1576,7 @@ class BaseFile(object):
     def __init__(self, filename, projzip):
         self.filename = filename
         self._projzip = projzip
+        self._parsed = False
         if filename is not None:
             self.load_file()
     def __repr__(self):
@@ -1605,6 +1598,7 @@ class BaseFile(object):
         except AttributeError:
             self.lns = [ln for ln in lns]
         fp.close()
+        self._projzip = None
     def has_sequence(self, str):
         ''' Checks if file contains specific string sequence.
         '''
@@ -1705,6 +1699,7 @@ class PythonFile(BaseFile):
         # post-processing 
         self._get_user_funcs()
         self._get_user_classes()
+        self._parsed = True
     def _get_user_funcs(self):
         ''' Identify which user defined functions are called from the same file.
 
@@ -1800,10 +1795,6 @@ class MATLABFile(BaseFile):
     def __init__(self, filename, zipfile, parent=None):
         super(MATLABFile,self).__init__(filename, zipfile)
         self._tree = None
-        if filename is not None:
-            self._parse_file(parent._mrtns_regexes, parent._mrtns_sub)
-        else:
-            self.all_keywords = []
     def _parse_file(self, regexes, sub):
         ''' Parse MATLAB file for function definition info.
         '''
@@ -1827,6 +1818,7 @@ class MATLABFile(BaseFile):
             self.all_keywords += [(m.start(), kw) for m in matches]
         # order matches by location in file
         self.all_keywords = [kw for i,kw in sorted(self.all_keywords, key = lambda x: x[0])]
+        self._parsed = True
     def _count_special(self, special, ln):
         return self.__getattribute__('_count_{:s}'.format(special))(ln)   
     def _count_anon_at(self, ln):
@@ -1952,22 +1944,24 @@ def _save_test(fl, err, lns, cl = None):
 def _File(filename, zipfile=None, parent=None):
     ''' Assess file type and return corresponding object.
     '''
-    ext = filename.lower().split('.')[-1]
+    dirname, flname, ext, exists = _path(filename)
+    ext = ext.lower()
 
     if zipfile is None:
-        assert os.path.isfile(filename), 'cannot find file at location'
+        if not exists:
+            raise FileNotFoundError('cannot find file \'{:s}\''.format(filename))
 
-    if ext == 'py':
+    if ext == '.py':
         return PythonFile(filename, zipfile=zipfile)
-    elif ext == 'png':
+    elif ext == '.png':
         return PNGFile(filename, zipfile=zipfile)
-    elif ext == 'txt':
+    elif ext == '.txt':
         return TxtFile(filename, zipfile=zipfile)
-    elif ext == 'm':
+    elif ext == '.m':
         return MATLABFile(filename, zipfile=zipfile, parent=parent)
-    elif ext == 'c':
+    elif ext == '.c':
         return CFile(filename, zipfile=zipfile)
-    elif ext == 'md':
+    elif ext == '.md':
         return TxtFile(filename, zipfile=zipfile)
     else:
         raise ValueError('unsupported file extension {:s}'.format(ext))
@@ -2186,5 +2180,24 @@ def _compare(file1, file2, name1, name2, template, compare_routine):
         return err
 
     return similarity
+def _parse_file(_mrtns_regexes, _mrtns_sub, flobj):
+    if flobj._tree == -1 or flobj._parsed:
+        return flobj
+
+    if type(flobj) is MATLABFile:
+        flobj._parse_file(_mrtns_regexes, _mrtns_sub)
+    elif type(flobj) is PythonFile:
+        flobj._parse_file()
+    else:
+        raise TypeError('unrecognized file type for parsing')
+    return flobj
+def _path(fl):
+    # function for parsing filename
+    fl = os.path.abspath(fl)
+    dirname = os.path.dirname(fl)
+    flname = os.path.basename(fl)
+    flname, ext = os.path.splitext(flname)
+    exists = os.path.isdir(fl) if not ext else os.path.isfile(fl)
+    return dirname, flname, ext, exists
 
 _builtin_compare_routines = {'command_freq':_compare_command_freq,'jaro':_compare_jaro, 'moss':_compare_moss}
