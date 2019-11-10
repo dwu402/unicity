@@ -13,7 +13,7 @@ To get started, first install unicity using ``pip``.
 ``pip install unicity``
 
 Then download the examples from `https://github.com/ddempsey/unicity 
-<https://github.com/ddempsey/unicity>`_. These will show you how to load a project, run a simple test, perform comparisons, and a few other tricks.
+<https://github.com/ddempsey/unicity>`_. These will show you how to load a project, run a simple test, perform comparisons, and a few other tricks. Or if you prefer a tutorial, see `here <https://sites.google.com/view/dempsey-research-group/unicity>`_.
 
 Some disclaimers:
 
