@@ -1856,7 +1856,7 @@ def _check_fuzzy_ratio(fl, expect):
     if flext.lower() != expect_ext.lower():
         return 0
     else:
-        return fuzz.partial_ratio(expect.lower(), fl.lower())
+        return fuzz.partial_ratio(expect.lower(), fl.lower()) + fuzz.ratio(expect.lower(), fl.lower())/100
 def _run_tests(ncpus, pars, timeout):
     ''' Logic for queueing and running tests.
     '''
